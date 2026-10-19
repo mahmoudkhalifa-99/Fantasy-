@@ -33,6 +33,7 @@ const ACTIONS: { type: MatchEventType; label: string; icon: string; cls: string 
   { type: 'og', label: 'عكسي', icon: '🥅', cls: 'bg-orange-600' },
   { type: 'pm', label: 'جزاء ضايع', icon: '❌', cls: 'bg-rose-700' },
   { type: 'ps', label: 'تصدي جزاء', icon: '🧤', cls: 'bg-teal-600' },
+  { type: 'tk', label: 'قطع كرة (مدافع)', icon: '🛡️', cls: 'bg-indigo-600' },
 ];
 const ICON: Record<string, string> = Object.fromEntries(ACTIONS.map((a) => [a.type, a.icon]));
 const LABEL: Record<string, string> = Object.fromEntries(ACTIONS.map((a) => [a.type, a.label]));
@@ -121,7 +122,7 @@ export const LiveMatchConsole: React.FC<Props> = ({ matches, teams, players, all
 
   const badges = (id: string) => {
     const s = stats[id] || {};
-    return [s.g ? `⚽${s.g}` : '', s.a ? `👟${s.a}` : '', s.yc ? '🟨'.repeat(s.yc) : '', s.rc ? '🟥' : '', s.og ? `🥅${s.og}` : '']
+    return [s.g ? `⚽${s.g}` : '', s.a ? `👟${s.a}` : '', s.yc ? '🟨'.repeat(s.yc) : '', s.rc ? '🟥' : '', s.og ? `🥅${s.og}` : '', s.tk ? `🛡️${s.tk}` : '']
       .filter(Boolean)
       .join(' ');
   };

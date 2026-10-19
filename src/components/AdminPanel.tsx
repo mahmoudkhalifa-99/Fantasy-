@@ -1177,7 +1177,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                           </div>
 
-                          {/* Clean sheet (GK & DEF) */}
+                          {/* Clean sheet (حارس ومدافع ووسط) */}
                           {player.pos !== 'FWD' && (
                             <button
                               type="button"
@@ -1190,6 +1190,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             >
                               🧤 شباك نظيفة {pStats.cs ? '✓' : ''}
                             </button>
+                          )}
+
+                          {/* قطع كرات (مدافع) */}
+                          {player.pos === 'DEF' && (
+                            <div className="bg-[#122218] p-2 rounded-lg flex items-center justify-between border border-emerald-800/40">
+                              <span className="font-bold text-white">🛡️ قطع كرات:</span>
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => modifyStat(player.id, 'tk', -1)} className="w-6 h-6 rounded bg-emerald-950 text-white font-bold">
+                                  -
+                                </button>
+                                <span className="font-mono font-black text-amber-300">{pStats.tk || 0}</span>
+                                <button type="button" onClick={() => modifyStat(player.id, 'tk', 1)} className="w-6 h-6 rounded bg-emerald-800 text-white font-bold">
+                                  +
+                                </button>
+                              </div>
+                            </div>
                           )}
 
                           {/* Penalty saved (GK) */}

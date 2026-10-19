@@ -46,7 +46,7 @@ function deriveFromList(roundMatches: Match[], players: Record<string, Player>, 
 
   // تصفير الإحصائيات المحسوبة للاعبي الفرق اللي عندها ماتش في الجولة دي
   const zero = (tid: string) => {
-    for (const p of byTeam(tid)) out[p.id] = { ...(existing[p.id] || {}), pl: 0, g: 0, a: 0, yc: 0, rc: 0, og: 0, pm: 0, ps: 0, cs: 0, mo: 0 };
+    for (const p of byTeam(tid)) out[p.id] = { ...(existing[p.id] || {}), pl: 0, g: 0, a: 0, yc: 0, rc: 0, og: 0, pm: 0, ps: 0, tk: 0, cs: 0, mo: 0 };
   };
   for (const m of roundMatches) for (const tid of [m.teamAId, m.teamBId]) zero(tid);
   extraResetTeams.forEach(zero);
@@ -72,6 +72,7 @@ function deriveFromList(roundMatches: Match[], players: Record<string, Player>, 
           if ((out[p.id].rc || 0) < 1) add(p.id, 'rc');
         } else if (e.type === 'pm') add(p.id, 'pm');
         else if (e.type === 'ps' && p.pos === 'GK') add(p.id, 'ps');
+        else if (e.type === 'tk' && p.pos === 'DEF') add(p.id, 'tk');
       }
     } else {
       // مباريات اتسجلت بقائمة هدافين مكتوبة (من غير أحداث)
@@ -123,7 +124,8 @@ function deriveFromList(roundMatches: Match[], players: Record<string, Player>, 
         [m.teamBId, m.scoreA],
       ];
       for (const [tid, conceded] of cleanFor)
-        if (conceded === 0) for (const p of byTeam(tid)) if (out[p.id]?.pl) out[p.id] = { ...out[p.id], cs: 1 };
+        // الكلين شيت تلقائي: للحارس والمدافع والوسط اللي لعبوا (مش للمهاجمين)
+        if (conceded === 0) for (const p of byTeam(tid)) if (p.pos !== 'FWD' && out[p.id]?.pl) out[p.id] = { ...out[p.id], cs: 1 };
     }
   }
   return out;

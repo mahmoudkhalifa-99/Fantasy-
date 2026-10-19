@@ -32,6 +32,7 @@ export const SCORING_MATRIX = {
     FWD: 0,
   },
   ps: 5, // penalty saved (GK)
+  tk: { per: 2, pts: 1 }, // قطع الكرات (للمدافع بس): كل 2 قطع = +1 نقطة
   mo: 3, // man of the match
   yc: -1, // yellow card
   rc: -3, // red card
@@ -63,8 +64,9 @@ export function calculatePlayerRoundPoints(
 
   if (stats.g) total += stats.g * SCORING_MATRIX.goal[player.pos];
   if (stats.a) total += stats.a * SCORING_MATRIX.assist;
-  if (stats.cs) total += SCORING_MATRIX.cs[player.pos];
+  if (stats.cs && player.pos !== 'FWD') total += SCORING_MATRIX.cs[player.pos]; // الكلين شيت للحارس والمدافع والوسط بس
   if (stats.ps && player.pos === 'GK') total += stats.ps * SCORING_MATRIX.ps;
+  if (stats.tk && player.pos === 'DEF') total += Math.floor(stats.tk / SCORING_MATRIX.tk.per) * SCORING_MATRIX.tk.pts;
   if (stats.mo) total += SCORING_MATRIX.mo;
   if (stats.yc) total += stats.yc * SCORING_MATRIX.yc;
   if (stats.rc) total += stats.rc * SCORING_MATRIX.rc;

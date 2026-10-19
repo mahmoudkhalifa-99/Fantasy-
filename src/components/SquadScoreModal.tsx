@@ -560,7 +560,8 @@ export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
                         {stats?.a ? (
                           <span className="text-cyan-300 font-mono">👟x{stats.a}</span>
                         ) : null}
-                        {stats?.cs ? <span className="text-emerald-300">🛡️</span> : null}
+                        {stats?.cs ? <span className="text-emerald-300">🧤CS</span> : null}
+                        {stats?.tk ? <span className="text-indigo-300 font-mono">🛡️x{stats.tk}</span> : null}
                         {stats?.mo ? <span className="text-yellow-400">⭐</span> : null}
                         {stats?.ps ? (
                           <span className="text-purple-300 font-mono">🧤x{stats.ps}</span>

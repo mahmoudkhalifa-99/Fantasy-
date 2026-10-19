@@ -31,6 +31,7 @@ export interface PlayerMatchStats {
   og?: number; // own goal
   pm?: number; // penalty missed
   ps?: number; // penalty saved (GK only)
+  tk?: number; // قطع كرات (مدافع بس)
   cs?: number; // clean sheet
   mo?: number; // man of the match
 }
@@ -77,7 +78,7 @@ export interface TournamentConfig {
   transferPenalty?: number; // خصم كل تحويل زيادة (الافتراضي 4 نقاط)
 }
 
-export type MatchEventType = 'goal' | 'og' | 'assist' | 'yc' | 'rc' | 'pm' | 'ps';
+export type MatchEventType = 'goal' | 'og' | 'assist' | 'yc' | 'rc' | 'pm' | 'ps' | 'tk';
 
 export interface MatchEvent {
   id: string;

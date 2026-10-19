@@ -79,6 +79,9 @@ export function applyEvent(
   else if (type === 'ps') {
     if (player.pos !== 'GK') return { match, stats };
     s = bump(s, playerId, 'ps', 1);
+  } else if (type === 'tk') {
+    if (player.pos !== 'DEF') return { match, stats };
+    s = bump(s, playerId, 'tk', 1);
   }
 
   m.events = [...(match.events ?? []), ev];
@@ -118,6 +121,7 @@ export function undoLast(
   else if (ev.type === 'rc') s = bump(s, ev.playerId, 'rc', -1);
   else if (ev.type === 'pm') s = bump(s, ev.playerId, 'pm', -1);
   else if (ev.type === 'ps') s = bump(s, ev.playerId, 'ps', -1);
+  else if (ev.type === 'tk') s = bump(s, ev.playerId, 'tk', -1);
 
   return { match: m, stats: s };
 }

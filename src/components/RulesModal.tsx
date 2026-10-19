@@ -111,7 +111,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
               </div>
 
               <div className="grid grid-cols-2 p-2 bg-[#101e15]">
-                <span>شباك نظيفة (حارس ومدافع)</span>
+                <span>شباك نظيفة (حارس ومدافع) - بتتحسب تلقائي</span>
                 <span className="text-left font-mono font-bold text-emerald-400">+{SCORING_MATRIX.cs.DEF}</span>
               </div>
 
@@ -121,11 +121,16 @@ export const RulesModal: React.FC<RulesModalProps> = ({
               </div>
 
               <div className="grid grid-cols-2 p-2 bg-[#101e15]">
+                <span>قطع الكرات (مدافع): كل {SCORING_MATRIX.tk.per} قطع</span>
+                <span className="text-left font-mono font-bold text-emerald-400">+{SCORING_MATRIX.tk.pts}</span>
+              </div>
+
+              <div className="grid grid-cols-2 p-2 bg-[#122218]">
                 <span>تصدي لركلة جزاء (حارس مرمى)</span>
                 <span className="text-left font-mono font-bold text-amber-400">+{SCORING_MATRIX.ps}</span>
               </div>
 
-              <div className="grid grid-cols-2 p-2 bg-[#122218]">
+              <div className="grid grid-cols-2 p-2 bg-[#101e15]">
                 <span>جائزة رجل المباراة</span>
                 <span className="text-left font-mono font-bold text-amber-400">+{SCORING_MATRIX.mo}</span>
               </div>
