@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Player, Team, TournamentConfig, Position, KitPattern, PlayerMatchStats, Match, Entry, TopStoryAd } from '../types';
+import { Player, Team, TournamentConfig, Position, KitPattern, PlayerMatchStats, Match, Entry, TopStoryAd, SquadSelection } from '../types';
 import { JerseyKit } from './JerseyKit';
 import { LiveMatchConsole } from './LiveMatchConsole';
 import { matchStartMs, formatDeadline } from '../utils/deadline';
@@ -82,6 +82,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onLiveUpdate,
 }) => {
   const [activeSection, setActiveSection] = useState<'live' | 'matches' | 'stats' | 'teams' | 'players' | 'users' | 'booking' | 'ads' | 'settings'>('live');
+
+  // عرض تشكيلات المستخدمين (للمنظم بس)
+  const [openUserId, setOpenUserId] = useState<string | null>(null);
+  const [userRoundSel, setUserRoundSel] = useState<Record<string, string>>({});
 
   // Config form state
   const [cfgName, setCfgName] = useState(cfg.name);
@@ -741,6 +745,71 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {u.email && <div className="text-emerald-200 break-all" dir="ltr">{u.email}</div>}
                     {u.phone && <div className="text-emerald-200" dir="ltr">{u.phone}</div>}
                     {u.joined ? <div className="text-emerald-500">انضم: {new Date(u.joined).toLocaleDateString('ar-EG')}</div> : null}
+                    <button
+                      type="button"
+                      onClick={() => setOpenUserId(openUserId === u.id ? null : u.id)}
+                      className="mt-1 w-full bg-emerald-800/40 hover:bg-emerald-700/50 border border-emerald-700/60 text-emerald-100 font-bold rounded-lg py-1.5"
+                    >
+                      {openUserId === u.id ? 'اقفل التشكيلة ▲' : 'شوف التشكيلات ▼'}
+                    </button>
+                    {openUserId === u.id && (() => {
+                      const roundKeys = Object.keys(u.rounds || {}).sort((a, b) => Number(a) - Number(b));
+                      const options: { key: string; label: string; sq: SquadSelection | undefined }[] = [
+                        ...roundKeys.map((k) => ({ key: k, label: `الجولة ${k}`, sq: u.rounds[Number(k)] })),
+                        ...(u.bk ? [{ key: 'bk', label: 'الحجز', sq: u.bk }] : []),
+                      ];
+                      if (options.length === 0) return <p className="text-emerald-300 font-bold pt-1">المشترك ده لسه ما حفظش تشكيلة.</p>;
+                      const selKey = options.some((o) => o.key === userRoundSel[u.id]) ? userRoundSel[u.id] : options[options.length - 1].key;
+                      const cur = options.find((o) => o.key === selKey)!;
+                      const sq = cur.sq;
+                      const ids = sq?.ids ?? [];
+                      const sorted = [...ids].sort((a, b) => POS_ORDER.indexOf(players[a]?.pos as Position) - POS_ORDER.indexOf(players[b]?.pos as Position));
+                      const row = (pid: string) => {
+                        const pl = players[pid];
+                        return (
+                          <div key={pid} className="flex items-center justify-between gap-2 bg-[#122218] rounded-lg px-2 py-1.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] font-black text-amber-300 w-8 shrink-0">{pl ? POSITIONS_SHORT[pl.pos] : '؟'}</span>
+                              <span className="text-white font-bold truncate">{pl ? pl.name : 'لاعب محذوف'}</span>
+                              {sq?.cap === pid && <span className="bg-amber-400 text-black text-[10px] font-black rounded-full px-1.5">C</span>}
+                            </div>
+                            <span className="text-emerald-400 shrink-0">{pl ? (teams[pl.teamId]?.name ?? '') : ''}</span>
+                          </div>
+                        );
+                      };
+                      return (
+                        <div className="pt-2 space-y-2">
+                          <div className="flex flex-wrap gap-1">
+                            {options.map((o) => (
+                              <button
+                                key={o.key}
+                                type="button"
+                                onClick={() => setUserRoundSel({ ...userRoundSel, [u.id]: o.key })}
+                                className={`px-2.5 py-1 rounded-full font-black border ${o.key === selKey ? 'bg-amber-400 text-black border-amber-400' : 'bg-[#122218] text-emerald-200 border-emerald-700/60'}`}
+                              >
+                                {o.label}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-emerald-300">
+                            {sq?.form && <span>الخطة: <b className="text-white" dir="ltr">{sq.form}</b></span>}
+                            {sq?.chip && <span>الكارت: <b className="text-white">{sq.chip === 'wildcard' ? 'Wildcard' : 'Free Hit'}</b></span>}
+                            {sq?.tc ? <span>التحويلات: <b className="text-white">{sq.tc}</b></span> : null}
+                            {sq?.pen ? <span>الخصم: <b className="text-red-300">-{sq.pen}</b></span> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <div className="text-emerald-400 font-black">التشكيلة الأساسية ({ids.length})</div>
+                            {sorted.map(row)}
+                          </div>
+                          {sq?.bench && sq.bench.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="text-emerald-400 font-black">الدكة ({sq.bench.length})</div>
+                              {sq.bench.map(row)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
             </div>
