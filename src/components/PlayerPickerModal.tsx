@@ -19,6 +19,8 @@ interface PlayerPickerModalProps {
   allRoundStats: Record<number, { p: Record<string, any> }>;
   matches?: Record<string, Match>;
   entries?: Record<string, Entry>;
+  benchIds?: string[]; // الدكة الاحتياطي الحالية (بتتحسب في الميزانية وحد الفريق)
+  benchMode?: boolean; // بنختار لاعب للدكة (مركز واحد: targetPos)
   replacingId?: string | null; // لو بنبدّل لاعب موجود في التشكيلة (بنحسب القيود من غيره)
 }
 
@@ -35,6 +37,8 @@ export const PlayerPickerModal: React.FC<PlayerPickerModalProps> = ({
   allRoundStats,
   matches = {},
   entries,
+  benchIds = [],
+  benchMode = false,
   replacingId = null,
 }) => {
   const [selectedPos, setSelectedPos] = useState<Position | 'ALL'>(targetPos || 'ALL');
@@ -66,10 +70,19 @@ export const PlayerPickerModal: React.FC<PlayerPickerModalProps> = ({
         if (p.pos !== 'GK') teamCounts[p.teamId] = (teamCounts[p.teamId] || 0) + 1; // الحراس مستثنيين من حد الفريق
       }
     });
+    // الدكة بتتحسب في الميزانية وحد الفريق (بس مش في عدد اللاعبين الأساسيين)
+    benchIds.forEach((id) => {
+      if (replacingId && id === replacingId) return;
+      const p = players[id];
+      if (p) {
+        spent += Number(p.price) || 0;
+        if (p.pos !== 'GK') teamCounts[p.teamId] = (teamCounts[p.teamId] || 0) + 1;
+      }
+    });
 
     const budgetRemaining = Math.max(0, cfg.budget - spent);
     return { spent, budgetRemaining, posCounts, teamCounts };
-  }, [squadIds, players, cfg.budget, replacingId]);
+  }, [squadIds, benchIds, players, cfg.budget, replacingId]);
 
   const reqForm = parseFormation(formation);
 
@@ -108,19 +121,25 @@ export const PlayerPickerModal: React.FC<PlayerPickerModalProps> = ({
 
   // Check if player can be added
   const getAddRestriction = (player: Player): string | null => {
-    if (squadIds.includes(player.id)) {
+    if (squadIds.includes(player.id) || benchIds.includes(player.id)) {
       return 'موجود بالتشكيلة';
     }
-    if (!replacingId && squadIds.length >= 7) {
-      return 'التشكيلة مكتملة (7 لاعبين)';
-    }
-    if (replacingId && players[replacingId] && players[replacingId].pos !== player.pos) {
-      return `التبديل لازم يكون بنفس المركز (${POSITIONS_SHORT[players[replacingId].pos]})`;
-    }
-    const currentPosCount = squadMetrics.posCounts[player.pos] || 0;
-    const maxAllowedForPos = reqForm[player.pos];
-    if (currentPosCount >= maxAllowedForPos) {
-      return `اكتمل مركز ${POSITIONS_SHORT[player.pos]} في خطة ${formation}`;
+    if (benchMode) {
+      if (targetPos !== 'ALL' && player.pos !== targetPos) {
+        return `خانة الدكة دي لـ ${POSITIONS_SHORT[targetPos]} بس`;
+      }
+    } else {
+      if (!replacingId && squadIds.length >= 7) {
+        return 'التشكيلة مكتملة (7 لاعبين)';
+      }
+      if (replacingId && players[replacingId] && players[replacingId].pos !== player.pos) {
+        return `التبديل لازم يكون بنفس المركز (${POSITIONS_SHORT[players[replacingId].pos]})`;
+      }
+      const currentPosCount = squadMetrics.posCounts[player.pos] || 0;
+      const maxAllowedForPos = reqForm[player.pos];
+      if (currentPosCount >= maxAllowedForPos) {
+        return `اكتمل مركز ${POSITIONS_SHORT[player.pos]} في خطة ${formation}`;
+      }
     }
     const currentFromTeam = squadMetrics.teamCounts[player.teamId] || 0;
     if (player.pos !== 'GK' && currentFromTeam >= cfg.maxPerTeam) {

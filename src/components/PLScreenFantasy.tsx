@@ -41,6 +41,9 @@ interface PLScreenFantasyProps {
   userName: string;
   matches?: Record<string, Match>;
   squadIds: string[];
+  benchIds?: string[];
+  onBenchSlotClick?: (pos: Position, replacingId?: string) => void;
+  onRemoveBench?: (playerId: string) => void;
   captainId: string;
   formation: string;
   isDraftDirty: boolean;
@@ -71,6 +74,9 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   userName,
   matches = {},
   squadIds,
+  benchIds = [],
+  onBenchSlotClick,
+  onRemoveBench,
   captainId,
   formation,
   isDraftDirty,
@@ -125,8 +131,8 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   // Dynamic automatic calculation of user live points based on current squad & captain
   const userScore = useMemo(() => {
     if (!squadIds.length) return 0;
-    return calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc) - roundPenalty(entries[currentUserId]?.rounds, cfg.round);
-  }, [squadIds, captainId, players, roundStatsDoc, entries, currentUserId, cfg.round]);
+    return calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc, benchIds) - roundPenalty(entries[currentUserId]?.rounds, cfg.round);
+  }, [squadIds, benchIds, captainId, players, roundStatsDoc, entries, currentUserId, cfg.round]);
 
   // Dynamic automatic calculation of all entries scores + user live score
   const { avgScore, highScore } = useMemo(() => {
@@ -136,7 +142,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
     Object.values(entries).forEach((e) => {
       // If this entry is the current user and user has live edits, use live squad
       if (e.id === currentUserId && squadIds.length > 0) {
-        scores.push(calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc) - roundPenalty(e.rounds, cfg.round));
+        scores.push(calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc, benchIds) - roundPenalty(e.rounds, cfg.round));
         return;
       }
 
@@ -150,7 +156,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
         }
       }
       if (sq && sq.ids && sq.ids.length > 0) {
-        scores.push(calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc) - roundPenalty(e.rounds, cfg.round));
+        scores.push(calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || []) - roundPenalty(e.rounds, cfg.round));
       }
     });
 
@@ -185,7 +191,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
     : 'التعديل مفتوح لحد ما أول ماتش في الجولة يبدأ';
 
   // Dynamic budget calculation
-  const totalCost = squadIds.reduce(
+  const totalCost = [...squadIds, ...benchIds].reduce(
     (sum, pid) => sum + (Number(players[pid]?.price) || 0),
     0
   );
@@ -407,6 +413,9 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
 
           <PitchView
             squadIds={squadIds}
+            benchIds={benchIds}
+            onBenchSlotClick={onBenchSlotClick}
+            onRemoveBench={onRemoveBench}
             captainId={captainId}
             formation={formation}
             players={players}
@@ -435,6 +444,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
           currentUserId={currentUserId}
           currentUserSquadIds={squadIds}
           currentUserCaptainId={captainId}
+          currentUserBenchIds={benchIds}
         />
       )}
     </div>

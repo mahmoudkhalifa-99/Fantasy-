@@ -51,7 +51,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           squadForRound.ids,
           squadForRound.cap,
           players,
-          allRoundStats[rNum]?.p || {}
+          allRoundStats[rNum]?.p || {},
+          squadForRound.bench || []
         ) - roundPenalty(entry.rounds, rNum);
         roundScores[rNum] = roundPts;
         totalScore += roundPts;

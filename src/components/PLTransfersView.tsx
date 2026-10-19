@@ -44,6 +44,7 @@ interface PLTransfersViewProps {
   matches: Record<string, Match>;
   allRoundStats: Record<number, { p: Record<string, PlayerMatchStats> }>;
   squadIds: string[];
+  benchIds?: string[];
   captainId: string;
   formation: string;
   onBack: () => void;
@@ -66,6 +67,7 @@ export const PLTransfersView: React.FC<PLTransfersViewProps> = ({
   matches,
   allRoundStats,
   squadIds,
+  benchIds = [],
   captainId,
   formation,
   onBack,
@@ -87,7 +89,7 @@ export const PLTransfersView: React.FC<PLTransfersViewProps> = ({
   const tInfo = transferInfo(squadIds, baseIds, activeChip, cfg);
 
   // Compute budget
-  const totalCost = squadIds.reduce((sum, pid) => sum + (Number(players[pid]?.price) || 0), 0);
+  const totalCost = [...squadIds, ...benchIds].reduce((sum, pid) => sum + (Number(players[pid]?.price) || 0), 0);
   const remainingBudget = Math.max(0, cfg.budget - totalCost);
 
   // Group squad by position

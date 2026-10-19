@@ -43,6 +43,7 @@ interface SquadScoreModalProps {
   currentUserId: string;
   currentUserSquadIds: string[];
   currentUserCaptainId: string;
+  currentUserBenchIds?: string[];
 }
 
 export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
@@ -58,6 +59,7 @@ export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
   currentUserId,
   currentUserSquadIds,
   currentUserCaptainId,
+  currentUserBenchIds = [],
 }) => {
   const [highestMode, setHighestMode] = useState<'manager' | 'dreamteam'>('manager');
 
@@ -85,7 +87,7 @@ export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
         }
       }
       if (sq && sq.ids && sq.ids.length > 0) {
-        const score = calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc) - roundPenalty(e.rounds, round);
+        const score = calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || []) - roundPenalty(e.rounds, round);
         if (score > bestScore) {
           bestScore = score;
           bestEntry = e;
@@ -102,7 +104,8 @@ export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
         currentUserSquadIds,
         currentUserCaptainId,
         players,
-        roundStatsDoc
+        roundStatsDoc,
+        currentUserBenchIds
       );
       if (liveScore > bestScore) {
         bestScore = liveScore;
@@ -197,7 +200,7 @@ export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
       }
       if (sq && sq.ids && sq.ids.length > 0) {
         allManagerScores.push(
-          calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc) - roundPenalty(e.rounds, round)
+          calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || []) - roundPenalty(e.rounds, round)
         );
       }
     });
@@ -208,7 +211,8 @@ export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
           currentUserSquadIds,
           currentUserCaptainId,
           players,
-          roundStatsDoc
+          roundStatsDoc,
+          currentUserBenchIds
         )
       );
     }

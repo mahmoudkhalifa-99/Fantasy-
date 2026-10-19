@@ -42,6 +42,10 @@ export const SCORING_MATRIX = {
 
 export const SQUAD_SIZE = 7;
 
+/** الدكة الاحتياطي: 3 لاعبين بالظبط (مدافع + وسط + مهاجم)، اختيارية. */
+export const BENCH_POSITIONS: Position[] = ['DEF', 'MID', 'FWD'];
+export const BENCH_SIZE = BENCH_POSITIONS.length;
+
 export const SUPPORTED_FORMATIONS = ['2-2-2', '3-2-1', '2-3-1', '3-1-2', '2-1-3'];
 
 export function parseFormation(f: string = '2-2-2'): Record<Position, number> {
@@ -98,7 +102,8 @@ export function calculateSquadRoundPoints(
   squadIds: string[],
   captainId: string,
   players: Record<string, Player>,
-  roundStats: Record<string, PlayerMatchStats> = {}
+  roundStats: Record<string, PlayerMatchStats> = {},
+  benchIds: string[] = []
 ): number {
   let total = 0;
   for (const pid of squadIds) {
@@ -107,7 +112,45 @@ export function calculateSquadRoundPoints(
     const pts = calculatePlayerRoundPoints(player, stats);
     total += pid === captainId ? pts * 2 : pts;
   }
+  // تبديل تلقائي: لو لاعب أساسي (غير الحارس) مالعبش، الاحتياطي في نفس مركزه ياخد مكانه لو لعب
+  const usedStarters = new Set<string>();
+  for (const bid of benchIds) {
+    const b = players[bid];
+    if (!b || b.pos === 'GK' || !roundStats[bid]?.pl) continue;
+    const slot = squadIds.find((sid) => !usedStarters.has(sid) && players[sid]?.pos === b.pos && !roundStats[sid]?.pl);
+    if (!slot) continue;
+    usedStarters.add(slot);
+    total += calculatePlayerRoundPoints(b, roundStats[bid]);
+  }
   return total;
+}
+
+/** تحقق الدكة: لاعب واحد بالكتير من كل مركز (دفاع/وسط/هجوم)، من غير تكرار مع الأساسي. */
+export function benchErrors(benchIds: string[], squadIds: string[], players: Record<string, Player>): string[] {
+  const errors: string[] = [];
+  if (benchIds.length > BENCH_SIZE) errors.push(`الدكة ${BENCH_SIZE} لاعبين بس`);
+  const seen = new Set<string>();
+  for (const id of benchIds) {
+    const p = players[id];
+    if (!p) continue;
+    if (squadIds.includes(id) || seen.has(id)) {
+      errors.push('لاعب مكرر بين الأساسي والاحتياطي');
+      break;
+    }
+    seen.add(id);
+  }
+  const counts: Record<string, number> = {};
+  for (const id of benchIds) {
+    const p = players[id];
+    if (!p) continue;
+    if (!BENCH_POSITIONS.includes(p.pos)) {
+      errors.push('الدكة: مدافع ووسط ومهاجم بس (من غير حارس)');
+      break;
+    }
+    counts[p.pos] = (counts[p.pos] || 0) + 1;
+  }
+  if (Object.values(counts).some((n) => n > 1)) errors.push('الدكة: لاعب واحد بس من كل مركز');
+  return errors;
 }
 
 export function validateSquad(
@@ -115,7 +158,8 @@ export function validateSquad(
   captainId: string,
   players: Record<string, Player>,
   cfg: TournamentConfig,
-  formation: string = '2-2-2'
+  formation: string = '2-2-2',
+  benchIds: string[] = []
 ): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
   const reqForm = parseFormation(formation);
@@ -130,6 +174,15 @@ export function validateSquad(
     if (p.pos !== 'GK') teamCounts[p.teamId] = (teamCounts[p.teamId] || 0) + 1; // الحراس مستثنيين من الحد الأقصى للفريق
     totalCost += Number(p.price) || 0;
   }
+
+  // الدكة بتتحسب في الميزانية وفي حد الفريق الواحد (الحراس مستثنيين)
+  for (const bid of benchIds) {
+    const bp = players[bid];
+    if (!bp) continue;
+    if (bp.pos !== 'GK') teamCounts[bp.teamId] = (teamCounts[bp.teamId] || 0) + 1;
+    totalCost += Number(bp.price) || 0;
+  }
+  errors.push(...benchErrors(benchIds, squadIds, players));
 
   if (squadIds.length !== SQUAD_SIZE) {
     errors.push(`يجب اختيار ${SQUAD_SIZE} لاعبين بالتمام (اخترت ${squadIds.length})`);

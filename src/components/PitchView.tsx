@@ -1,7 +1,7 @@
 import React from 'react';
 import { Player, Team, Position } from '../types';
 import { JerseyKit } from './JerseyKit';
-import { POSITIONS_SHORT, parseFormation, calculatePlayerRoundPoints } from '../utils/fantasyScoring';
+import { POSITIONS_SHORT, BENCH_POSITIONS, parseFormation, calculatePlayerRoundPoints } from '../utils/fantasyScoring';
 import { Crown, Plus, Trash2, ShieldAlert, ArrowRightLeft } from 'lucide-react';
 
 interface PitchViewProps {
@@ -19,6 +19,9 @@ interface PitchViewProps {
   ptsMap?: Record<string, { round: number; total: number }>; // نقاط الجولة الحالية والإجمالي لكل لاعب
   onSetCaptain?: (playerId: string) => void;
   onPlayerClick?: (player: Player) => void;
+  benchIds?: string[]; // الدكة الاحتياطي (مدافع + وسط + مهاجم)
+  onBenchSlotClick?: (pos: Position, replacingId?: string) => void;
+  onRemoveBench?: (playerId: string) => void;
 }
 
 export const PitchView: React.FC<PitchViewProps> = ({
@@ -36,6 +39,9 @@ export const PitchView: React.FC<PitchViewProps> = ({
   ptsMap,
   onSetCaptain,
   onPlayerClick,
+  benchIds = [],
+  onBenchSlotClick,
+  onRemoveBench,
 }) => {
   const reqCounts = parseFormation(formation);
 
@@ -227,6 +233,87 @@ export const PitchView: React.FC<PitchViewProps> = ({
         {/* 4. Goalkeeper (GK) */}
         {renderRow('GK', reqCounts.GK)}
       </div>
+
+      {/* الدكة الاحتياطي: مدافع + وسط + مهاجم */}
+      {(!isReadOnly || benchIds.length > 0) && (
+        <div className="relative bg-emerald-950/70 border-t-2 border-emerald-500/30 px-3 py-3">
+          <div className="text-center text-xs font-black text-emerald-200 mb-2">الاحتياطي</div>
+          <div className="flex justify-center items-start gap-2 sm:gap-4">
+            {BENCH_POSITIONS.map((pos) => {
+              const player = benchIds.map((id) => players[id]).find((p) => p && p.pos === pos);
+              if (!player) {
+                if (isReadOnly) return null;
+                return (
+                  <button
+                    key={`bench-empty-${pos}`}
+                    type="button"
+                    onClick={() => onBenchSlotClick && onBenchSlotClick(pos)}
+                    className="flex flex-col items-center justify-center w-[84px] sm:w-[98px] h-[95px] sm:h-[105px] rounded-xl border-2 border-dashed border-white/40 hover:border-amber-400 bg-white/5 hover:bg-white/10 transition-all text-white/80 hover:text-white p-2"
+                    title={`إضافة ${POSITIONS_SHORT[pos]} احتياطي`}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center mb-1">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-bold">+ {POSITIONS_SHORT[pos]}</span>
+                  </button>
+                );
+              }
+              const team = teams[player.teamId];
+              const pts = showPoints && roundStats ? calculatePlayerRoundPoints(player, roundStats[player.id]) : null;
+              return (
+                <div
+                  key={player.id}
+                  onClick={() => onPlayerClick && onPlayerClick(player)}
+                  className="group relative flex flex-col items-center w-[84px] sm:w-[98px] cursor-pointer"
+                >
+                  <div className="text-[10px] font-black text-emerald-300 mb-0.5">{POSITIONS_SHORT[pos]}</div>
+                  {!isReadOnly && onRemoveBench && (
+                    <button
+                      type="button"
+                      title="إزالة من الدكة"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveBench(player.id);
+                      }}
+                      className="absolute top-3 right-1 z-20 w-6 h-6 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg hover:bg-red-700"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                  {!isReadOnly && onBenchSlotClick && (
+                    <button
+                      type="button"
+                      title="تبديل اللاعب"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onBenchSlotClick(pos, player.id);
+                      }}
+                      className="absolute top-9 -right-1 z-20 w-6 h-6 rounded-full bg-sky-600/90 text-white flex items-center justify-center shadow-lg hover:bg-sky-700"
+                    >
+                      <ArrowRightLeft className="w-3 h-3" />
+                    </button>
+                  )}
+                  <div className="relative py-1">
+                    <JerseyKit c1={team?.c1} c2={team?.c2} pat={team?.pat} num={player.num} kitUrl={team?.kitUrl} size="md" />
+                  </div>
+                  <div className="w-full bg-emerald-950/95 border border-emerald-600/40 rounded-lg overflow-hidden shadow-lg text-center mt-0.5">
+                    <div className="px-1 py-0.5 text-[11px] sm:text-xs font-bold text-white truncate leading-tight">{player.name}</div>
+                    <div className="bg-emerald-900/90 px-1 py-0.5 text-[10px] text-emerald-200 flex items-center justify-between font-semibold border-t border-emerald-800/60">
+                      <span className="truncate max-w-[50px]">{team?.name || 'فريق'}</span>
+                      {pts !== null ? (
+                        <span className="font-extrabold text-amber-300">{pts} ن</span>
+                      ) : (
+                        <span className="font-mono text-emerald-300">{player.price}م</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-center text-[10px] text-emerald-300/70 mt-2">لو أساسي في نفس المركز مالعبش، الاحتياطي بياخد مكانه تلقائي</p>
+        </div>
+      )}
     </div>
   );
 };

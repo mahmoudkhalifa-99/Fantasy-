@@ -167,6 +167,19 @@ function validateSquad(sq: any, main: Data, budget: number): string | null {
     if (p.pos !== 'GK') perTeam[p.teamId] = (perTeam[p.teamId] ?? 0) + 1; // الحراس مستثنيين من حد الفريق
     cost += Number(p.price) || 0;
   }
+  // الدكة (اختيارية): لاعب واحد بالكتير من دفاع/وسط/هجوم، وبتتحسب في الميزانية وحد الفريق
+  const bench = sq.bench ?? [];
+  if (!Array.isArray(bench) || bench.length > 3) return 'الدكة 3 لاعبين بالكتير';
+  const benchPos = new Set<string>();
+  for (const id of bench) {
+    const p = typeof id === 'string' ? main.players?.[id] : null;
+    if (!p) return 'لاعب غير موجود في الدكة';
+    if (ids.includes(id) || bench.indexOf(id) !== bench.lastIndexOf(id)) return 'لاعب متكرر بين الأساسي والدكة';
+    if (!['DEF', 'MID', 'FWD'].includes(p.pos) || benchPos.has(p.pos)) return 'الدكة: مدافع ووسط ومهاجم (واحد من كل مركز)';
+    benchPos.add(p.pos);
+    if (p.pos !== 'GK') perTeam[p.teamId] = (perTeam[p.teamId] ?? 0) + 1;
+    cost += Number(p.price) || 0;
+  }
   if (cost > budget + 0.001) return 'تجاوزت الميزانية';
   if (POS.some((k) => have[k] !== need[k])) return 'التشكيلة لا تطابق خطة اللعب';
   if (Object.values(perTeam).some((n) => n > Number(main.cfg?.maxPerTeam))) return 'تجاوزت الحد الأقصى من نفس الفريق';
@@ -203,6 +216,7 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
 
     rounds[editRound] = {
       ids: sq.ids,
+      ...(sq.bench?.length ? { bench: sq.bench } : {}),
       cap: sq.cap,
       form: String(sq.form ?? '2-2-2'),
       ...(chip ? { chip } : {}),
@@ -213,7 +227,7 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
     // Free Hit: التشكيلة بترجع تلقائيًا للي قبلها في الجولة اللي بعدها
     if (chip === 'freehit' && base && !rounds[nextKey]) {
       const prev = findPrevSquad(rounds, editRound);
-      if (prev) rounds[nextKey] = { ids: prev.ids, cap: prev.cap, form: prev.form ?? '2-2-2', tc: 0, pen: 0, auto: true };
+      if (prev) rounds[nextKey] = { ids: prev.ids, ...(prev.bench?.length ? { bench: prev.bench } : {}), cap: prev.cap, form: prev.form ?? '2-2-2', tc: 0, pen: 0, auto: true };
     }
   }
 
@@ -224,7 +238,7 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
     if (isBookingLocked(main.booking, main.matches)) return { error: 'تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)' };
     const err = validateSquad(incoming.bk, main, Number(cfg.budget));
     if (err) return { error: err };
-    bk = { ids: incoming.bk.ids, cap: incoming.bk.cap, form: String(incoming.bk.form ?? '2-2-2') };
+    bk = { ids: incoming.bk.ids, ...(incoming.bk.bench?.length ? { bench: incoming.bk.bench } : {}), cap: incoming.bk.cap, form: String(incoming.bk.form ?? '2-2-2') };
   }
   const phone = incoming?.phone !== undefined ? String(incoming.phone).replace(/[^\d+]/g, '').slice(0, 15) : existing?.phone;
   const joined = existing?.joined ?? (Number(incoming?.joined) || Date.now());

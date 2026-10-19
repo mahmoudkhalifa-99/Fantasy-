@@ -61,7 +61,7 @@ export const RoundsView: React.FC<RoundsViewProps> = ({
         }
       }
     }
-    return sq ? calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc) - roundPenalty(e.rounds, selectedRound) : 0;
+    return sq ? calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || []) - roundPenalty(e.rounds, selectedRound) : 0;
   });
 
   const avgScore = allScores.length
@@ -69,7 +69,7 @@ export const RoundsView: React.FC<RoundsViewProps> = ({
     : 0;
   const highScore = allScores.length ? Math.max(...allScores) : 0;
   const userScore = userSquad
-    ? calculateSquadRoundPoints(userSquad.ids, userSquad.cap, players, roundStatsDoc) - roundPenalty(userEntry?.rounds, selectedRound)
+    ? calculateSquadRoundPoints(userSquad.ids, userSquad.cap, players, roundStatsDoc, userSquad.bench || []) - roundPenalty(userEntry?.rounds, selectedRound)
     : 0;
 
   // Star players of this round (sorted by points)
@@ -251,6 +251,7 @@ export const RoundsView: React.FC<RoundsViewProps> = ({
           displayMode === 'pitch' ? (
             <PitchView
               squadIds={userSquad.ids}
+              benchIds={userSquad.bench || []}
               captainId={userSquad.cap}
               formation={userSquad.form || '2-2-2'}
               players={players}

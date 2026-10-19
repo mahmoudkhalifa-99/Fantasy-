@@ -47,7 +47,7 @@ export function computeStandings(
     for (const r of rounds) {
       let sq = entry.rounds?.[r];
       if (!sq) for (let i = r - 1; i >= 1 && !sq; i--) sq = entry.rounds?.[i];
-      byRound[r] = sq ? calculateSquadRoundPoints(sq.ids, sq.cap, players, allRoundStats[r]?.p || {}) - roundPenalty(entry.rounds, r) : 0;
+      byRound[r] = sq ? calculateSquadRoundPoints(sq.ids, sq.cap, players, allRoundStats[r]?.p || {}, sq.bench || []) - roundPenalty(entry.rounds, r) : 0;
     }
     const total = rounds.reduce((a, r) => a + byRound[r], 0);
     return { entry, byRound, total };

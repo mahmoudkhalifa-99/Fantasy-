@@ -126,6 +126,8 @@ export default function App() {
   // Draft squad state
   const [squadIds, setSquadIds] = useState<string[]>([]);
   const [captainId, setCaptainId] = useState<string>('');
+  const [benchIds, setBenchIds] = useState<string[]>([]);
+  const [benchPickPos, setBenchPickPos] = useState<Position | null>(null);
   const [formation, setFormation] = useState<string>('2-2-2');
   const [isDraftDirty, setIsDraftDirty] = useState<boolean>(false);
   const [booking, setBooking] = useState<BookingState | null>(null);
@@ -255,10 +257,12 @@ export default function App() {
           setActiveChip(null);
           if (sq && sq.ids) {
             setSquadIds(sq.ids);
+            setBenchIds(sq.bench || []);
             setCaptainId(sq.cap || sq.ids[0] || '');
             setFormation(sq.form || '2-2-2');
           } else {
             setSquadIds([]);
+            setBenchIds([]);
             setCaptainId('');
           }
         } else {
@@ -276,16 +280,19 @@ export default function App() {
           setActiveChip(uEntry.rounds[activeR]?.chip || null);
           if (sq && sq.ids) {
             setSquadIds(sq.ids);
+            setBenchIds(sq.bench || []);
             setCaptainId(sq.cap || sq.ids[0] || '');
             if (sq.form) setFormation(sq.form);
           } else {
             setSquadIds([]);
+            setBenchIds([]);
             setCaptainId('');
           }
         }
       } else {
         // حساب جديد: تشكيلة فاضية، المشترك هو اللي يختار لاعبينه
         setSquadIds([]);
+        setBenchIds([]);
         setCaptainId('');
       }
     } catch (err) {
@@ -471,7 +478,7 @@ export default function App() {
   // Squad actions
   const handleSaveSquad = async () => {
     if (blockIfBookingLocked()) return;
-    const check = validateSquad(squadIds, captainId, players, cfg, formation);
+    const check = validateSquad(squadIds, captainId, players, cfg, formation, benchIds);
     if (!check.isValid) {
       showToast(`⚠️ ${check.errors[0]}`);
       return;
@@ -485,13 +492,14 @@ export default function App() {
     };
     // وضع الحجز: بنحفظ في تشكيلة الحجز المنفصلة (bk) ومنلمسش تشكيلات الجولات
     const updatedUserEntry: Entry = isBookingMode
-      ? { ...baseEntry, rounds: {}, bk: { ids: [...squadIds], cap: captainId, form: formation } }
+      ? { ...baseEntry, rounds: {}, bk: { ids: [...squadIds], ...(benchIds.length ? { bench: [...benchIds] } : {}), cap: captainId, form: formation } }
       : {
           ...baseEntry,
           rounds: {
             ...(entries[userId]?.rounds || {}),
             [activeEditingRound]: {
               ids: [...squadIds],
+              ...(benchIds.length ? { bench: [...benchIds] } : {}),
               cap: captainId,
               form: formation,
               ...(activeChip ? { chip: activeChip } : {}),
@@ -536,6 +544,16 @@ export default function App() {
 
   const handleSelectPlayer = (player: Player) => {
     if (blockIfBookingLocked()) return;
+    // اختيار لاعب للدكة: بيحل محل لاعب نفس المركز في الدكة (لو موجود)
+    if (benchPickPos) {
+      if (player.pos !== benchPickPos || squadIds.includes(player.id)) return;
+      setBenchIds((prev) => [...prev.filter((id) => players[id]?.pos !== benchPickPos), player.id]);
+      setBenchPickPos(null);
+      setPlayerToReplaceId(null);
+      setIsDraftDirty(true);
+      showToast(`✅ تم إضافة ${player.name} للاحتياطي`);
+      return;
+    }
     if (playerToReplaceId) {
       const nextSquad = squadIds.map((id) => (id === playerToReplaceId ? player.id : id));
       setSquadIds(nextSquad);
@@ -562,6 +580,20 @@ export default function App() {
       setCaptainId(nextSquad[0] || '');
     }
     setIsDraftDirty(true);
+  };
+
+  const handleRemoveBench = (pid: string) => {
+    if (blockIfBookingLocked()) return;
+    setBenchIds((prev) => prev.filter((id) => id !== pid));
+    setIsDraftDirty(true);
+  };
+
+  const handleBenchSlotClick = (pos: Position, replacingId?: string) => {
+    if (blockIfBookingLocked()) return;
+    setPlayerToReplaceId(replacingId || null);
+    setBenchPickPos(pos);
+    setPickerTargetPos(pos);
+    setIsPickerOpen(true);
   };
 
   const handleSetCaptain = (pid: string) => {
@@ -868,6 +900,7 @@ export default function App() {
           matches={vMatches}
           allRoundStats={vStats}
           squadIds={squadIds}
+          benchIds={benchIds}
           captainId={captainId}
           formation={formation}
           entries={vEntries}
@@ -1003,6 +1036,9 @@ export default function App() {
                 userName={userName}
                 matches={vMatches}
                 squadIds={squadIds}
+                benchIds={benchIds}
+                onBenchSlotClick={handleBenchSlotClick}
+                onRemoveBench={handleRemoveBench}
                 captainId={captainId}
                 formation={formation}
                 isDraftDirty={isDraftDirty}
@@ -1163,8 +1199,11 @@ export default function App() {
         onClose={() => {
           setIsPickerOpen(false);
           setPlayerToReplaceId(null);
+          setBenchPickPos(null);
         }}
         replacingId={playerToReplaceId}
+        benchIds={benchIds}
+        benchMode={!!benchPickPos}
         onSelectPlayer={handleSelectPlayer}
         targetPos={pickerTargetPos}
         squadIds={squadIds}

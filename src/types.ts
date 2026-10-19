@@ -44,6 +44,7 @@ export type ChipType = 'wildcard' | 'freehit';
 
 export interface SquadSelection {
   ids: string[];
+  bench?: string[]; // الدكة الاحتياطي: مدافع + وسط + مهاجم (اختيارية)
   cap: string;
   form?: string; // e.g. "2-2-2", "3-2-1"
   chip?: ChipType; // كارت اتلعب في الجولة دي (السيرفر هو اللي بيحدده)
