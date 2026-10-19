@@ -97,6 +97,7 @@ export default function App() {
   const bookingActive = cfgRaw.mode === 'booking';
   const [viewMode, setViewMode] = useState<'main' | 'booking'>('main');
   const viewRef = useRef<'main' | 'booking'>('main');
+  const initialViewDone = useRef(false); // أول تحميل بس: لو الحجز جاهز نفتح فانتازي الحجز علطول
   const isBookingMode = bookingActive && viewMode === 'booking';
   const mainMatches = useMemo(
     () => Object.fromEntries(Object.entries(matches).filter(([, m]) => !m.booking)) as Record<string, Match>,
@@ -247,6 +248,16 @@ export default function App() {
       setBookingStats(data.bstats?.p ? data.bstats : { p: {} });
       setBooking(data.booking?.teamIds ? data.booking : null);
       if (data.topStories) setTopStories(data.topStories);
+
+      // أول دخول: لو الحجز جاهز، ادخل على فانتازي الحجز علطول (مش فانتازي الدورة)
+      if (!initialViewDone.current) {
+        initialViewDone.current = true;
+        if (data.cfg?.mode === 'booking' && data.booking?.teamIds && !isAdminPath()) {
+          viewRef.current = 'booking';
+          setViewMode('booking');
+          setCurrentTab('fantasy');
+        }
+      }
 
       // Auto-populate user squad if found
       const uid = localStorage.getItem('fantasy_dawra_uid');
