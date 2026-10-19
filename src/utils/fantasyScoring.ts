@@ -46,7 +46,30 @@ export const SQUAD_SIZE = 7;
 export const BENCH_POSITIONS: Position[] = ['DEF', 'MID', 'FWD'];
 export const BENCH_SIZE = BENCH_POSITIONS.length;
 
-export const SUPPORTED_FORMATIONS = ['2-2-2', '3-2-1', '2-3-1', '3-1-2', '2-1-3'];
+/** حدود كل مركز في الخطة (غير الحارس): أدنى 1، وأقصى دفاع 3 / وسط 3 / هجوم 2 (المجموع 6 لاعبين ميدان). */
+export const FORMATION_MIN = 1;
+export const FORMATION_MAX = { DEF: 3, MID: 3, FWD: 2 } as const;
+
+export function isValidFormation(f: string): boolean {
+  const parts = String(f).split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n))) return false;
+  const [d, m, x] = parts;
+  return (
+    d >= FORMATION_MIN && d <= FORMATION_MAX.DEF &&
+    m >= FORMATION_MIN && m <= FORMATION_MAX.MID &&
+    x >= FORMATION_MIN && x <= FORMATION_MAX.FWD &&
+    d + m + x === SQUAD_SIZE - 1
+  );
+}
+
+/** كل الخطط المسموحة (دفاع-وسط-هجوم) بين الحد الأدنى والأقصى. */
+export const SUPPORTED_FORMATIONS: string[] = (() => {
+  const out: string[] = [];
+  for (let d = FORMATION_MAX.DEF; d >= FORMATION_MIN; d--)
+    for (let m = FORMATION_MAX.MID; m >= FORMATION_MIN; m--)
+      for (let x = FORMATION_MAX.FWD; x >= FORMATION_MIN; x--) if (d + m + x === SQUAD_SIZE - 1) out.push(`${d}-${m}-${x}`);
+  return out;
+})();
 
 export function parseFormation(f: string = '2-2-2'): Record<Position, number> {
   const parts = f.split('-').map(Number);

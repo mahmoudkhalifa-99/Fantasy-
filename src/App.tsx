@@ -33,6 +33,9 @@ import { RegistrationModal } from './components/RegistrationModal';
 import {
   calculateSquadRoundPoints,
   validateSquad,
+  isValidFormation,
+  parseFormation,
+  POSITIONS_SHORT,
 } from './utils/fantasyScoring';
 import {
   Sparkles,
@@ -582,6 +585,26 @@ export default function App() {
     setIsDraftDirty(true);
   };
 
+  // تغيير الخطة: لازم عدد اللاعبين الحاليين في كل مركز ميزيدش عن الخطة الجديدة
+  const handleFormationChange = (f: string) => {
+    if (blockIfBookingLocked()) return;
+    if (!isValidFormation(f)) return;
+    const need = parseFormation(f);
+    const have: Record<Position, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+    squadIds.forEach((id) => {
+      const p = players[id];
+      if (p) have[p.pos] += 1;
+    });
+    for (const pos of ['DEF', 'MID', 'FWD'] as Position[]) {
+      if (have[pos] > need[pos]) {
+        showToast(`⚠️ عندك ${have[pos]} ${POSITIONS_SHORT[pos]} والخطة ${f} فيها ${need[pos]} بس. شيل لاعب الأول`);
+        return;
+      }
+    }
+    setFormation(f);
+    setIsDraftDirty(true);
+  };
+
   const handleRemoveBench = (pid: string) => {
     if (blockIfBookingLocked()) return;
     setBenchIds((prev) => prev.filter((id) => id !== pid));
@@ -1038,6 +1061,7 @@ export default function App() {
                 squadIds={squadIds}
                 benchIds={benchIds}
                 onBenchSlotClick={handleBenchSlotClick}
+                onFormationChange={handleFormationChange}
                 onRemoveBench={handleRemoveBench}
                 captainId={captainId}
                 formation={formation}

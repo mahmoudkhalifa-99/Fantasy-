@@ -16,6 +16,7 @@ import {
   calculatePlayerTotalPoints,
   parseFormation,
   SQUAD_SIZE,
+  SUPPORTED_FORMATIONS,
 } from '../utils/fantasyScoring';
 import {
   Shirt,
@@ -44,6 +45,7 @@ interface PLScreenFantasyProps {
   benchIds?: string[];
   onBenchSlotClick?: (pos: Position, replacingId?: string) => void;
   onRemoveBench?: (playerId: string) => void;
+  onFormationChange?: (f: string) => void;
   captainId: string;
   formation: string;
   isDraftDirty: boolean;
@@ -77,6 +79,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   benchIds = [],
   onBenchSlotClick,
   onRemoveBench,
+  onFormationChange,
   captainId,
   formation,
   isDraftDirty,
@@ -410,6 +413,26 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
               </button>
             )}
           </div>
+
+          {onFormationChange && (
+            <div className="mb-2">
+              <div className="text-[11px] font-bold text-emerald-300 mb-1">الخطة (دفاع-وسط-هجوم)</div>
+              <div className="flex flex-wrap gap-1.5">
+                {SUPPORTED_FORMATIONS.map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => onFormationChange(f)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono transition-colors ${
+                      f === formation ? 'bg-amber-400 text-amber-950' : 'bg-emerald-900/60 text-emerald-200 hover:bg-emerald-800'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <PitchView
             squadIds={squadIds}

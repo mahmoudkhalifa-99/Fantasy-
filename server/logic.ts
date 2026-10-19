@@ -154,7 +154,7 @@ function validateSquad(sq: any, main: Data, budget: number): string | null {
   if (!Array.isArray(ids) || ids.length !== SQUAD_SIZE) return `لازم تختار ${SQUAD_SIZE} لاعبين بالظبط`;
   if (new Set(ids).size !== ids.length) return 'لاعب متكرر في التشكيلة';
   const form = String(sq.form ?? '2-2-2').split('-').map(Number);
-  if (form.length !== 3 || form.some((n) => !Number.isInteger(n) || n < 0) || form[0] + form[1] + form[2] !== SQUAD_SIZE - 1)
+  if (form.length !== 3 || form.some((n) => !Number.isInteger(n) || n < 1) || form[0] > 3 || form[1] > 3 || form[2] > 2 || form[0] + form[1] + form[2] !== SQUAD_SIZE - 1)
     return 'خطة اللعب غير صحيحة';
   const need: Record<string, number> = { GK: 1, DEF: form[0], MID: form[1], FWD: form[2] };
   const have: Record<string, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
