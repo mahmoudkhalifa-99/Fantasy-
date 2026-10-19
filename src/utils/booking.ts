@@ -14,14 +14,29 @@ export interface BookingState extends BookingSnapshot {
   teamIds: string[]; // 3 أو 4 فرق
   round: number;
   startedAt: number;
+  startAt?: number; // ميعاد أول ماتش في الحجز (ميلي ثانية)، منه بيتحسب ديدلاين التشكيلة
   currentMatchId?: string;
   history: { matchId: string; before: BookingSnapshot }[];
 }
 
 export const BOOKING_MIN_TEAMS = 3;
 export const BOOKING_MAX_TEAMS = 4;
+export const BOOKING_DEADLINE_MINUTES = 15; // التشكيلة بتتقفل قبل أول ماتش في الحجز بربع ساعة
 
-export function createBooking(teamIds: string[], first: string, second: string, round: number): BookingState | string {
+/** موعد قفل تشكيلة الحجز (أو null لو المنظم ماحددش ميعاد أول ماتش). */
+export function bookingDeadlineMs(b: { startAt?: number } | null | undefined): number | null {
+  return b?.startAt ? b.startAt - BOOKING_DEADLINE_MINUTES * 60000 : null;
+}
+
+/** تشكيلة الحجز مقفولة لو الديدلاين عدّى أو أي ماتش حجز بدأ. */
+export function isBookingLocked(b: { startAt?: number } | null | undefined, matches: Record<string, Match> | undefined, now = Date.now()): boolean {
+  if (!b) return false;
+  const dl = bookingDeadlineMs(b);
+  if (dl !== null && now >= dl) return true;
+  return Object.values(matches ?? {}).some((m) => m.booking && m.status !== 'upcoming');
+}
+
+export function createBooking(teamIds: string[], first: string, second: string, round: number, startAt?: number): BookingState | string {
   const ids = Array.from(new Set(teamIds));
   if (ids.length < BOOKING_MIN_TEAMS || ids.length > BOOKING_MAX_TEAMS) return `وضع الحجز من ${BOOKING_MIN_TEAMS} لـ ${BOOKING_MAX_TEAMS} فرق`;
   if (!first || !second || first === second) return 'اختار فريقين مختلفين يبدأوا اللعب';
@@ -34,6 +49,7 @@ export function createBooking(teamIds: string[], first: string, second: string, 
     streaks: Object.fromEntries(ids.map((t) => [t, 0])),
     round,
     startedAt: Date.now(),
+    ...(startAt ? { startAt } : {}),
     history: [],
   };
 }

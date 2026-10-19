@@ -57,6 +57,7 @@ export interface Entry {
   phone?: string;
   email?: string;
   rounds: Record<number, SquadSelection>;
+  bk?: SquadSelection; // تشكيلة وضع الحجز (منفصلة عن تشكيلات الجولات)
   joined: number;
 }
 

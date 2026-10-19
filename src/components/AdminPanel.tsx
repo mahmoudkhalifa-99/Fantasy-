@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Player, Team, TournamentConfig, Position, KitPattern, PlayerMatchStats, Match, Entry, TopStoryAd } from '../types';
 import { JerseyKit } from './JerseyKit';
 import { LiveMatchConsole } from './LiveMatchConsole';
+import { matchStartMs, formatDeadline } from '../utils/deadline';
 import { BookingState, BOOKING_MAX_TEAMS, BOOKING_MIN_TEAMS, bookingTotals } from '../utils/booking';
 import type { LiveState } from '../utils/liveMatch';
 import { POSITIONS_SHORT, POS_ORDER, calculatePlayerRoundPoints } from '../utils/fantasyScoring';
@@ -27,7 +28,7 @@ interface AdminPanelProps {
   topStories?: Record<string, TopStoryAd>;
   onSaveTopStories?: (next: Record<string, TopStoryAd>) => Promise<boolean>;
   booking?: BookingState | null;
-  onStartBooking?: (teamIds: string[], first: string, second: string) => Promise<boolean>;
+  onStartBooking?: (teamIds: string[], first: string, second: string, startAt?: number) => Promise<boolean>;
   onEndBooking?: () => Promise<void> | void;
   entries?: Record<string, Entry>;
   cfg: TournamentConfig;
@@ -35,6 +36,7 @@ interface AdminPanelProps {
   players: Record<string, Player>;
   matches: Record<string, Match>;
   allRoundStats: Record<number, { p: Record<string, PlayerMatchStats> }>;
+  bookingStats?: { p: Record<string, PlayerMatchStats> };
   onUpdateConfig: (newCfg: TournamentConfig) => void;
   onAddTeam: (team: Omit<Team, 'id'>) => void;
   onUpdateTeam: (id: string, updates: Partial<Team>) => void;
@@ -63,6 +65,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   players,
   matches,
   allRoundStats,
+  bookingStats,
   onUpdateConfig,
   onAddTeam,
   onUpdateTeam,
@@ -209,6 +212,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bkFirst, setBkFirst] = useState('');
   const [bkSecond, setBkSecond] = useState('');
   const [bkBusy, setBkBusy] = useState(false);
+  const [bkDate, setBkDate] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' }));
+  const [bkTime, setBkTime] = useState('20:00');
+  const bkStartAt = matchStartMs(bkDate, bkTime);
   const bkChosen = bkTeams.filter((t) => teams[t]);
   const bkRows = bookingTotals(matches, booking);
   const tName = (id: string) => teams[id]?.name || '—';
@@ -480,7 +486,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 type="button"
                 disabled={bkBusy}
                 onClick={async () => {
-                  if (!window.confirm('إنهاء وضع الحجز؟ الإجماليات هتفضل محفوظة.')) return;
+                  if (!window.confirm('إنهاء وضع الحجز؟ هيتصفّر كل حاجة في الحجز: إجماليات الفرق ونقاط اللاعبين والمباريات. تشكيلات الوضع الأساسي مش هتتأثر.')) return;
                   setBkBusy(true);
                   await onEndBooking?.();
                   setBkBusy(false);
@@ -537,12 +543,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </label>
                 </div>
               )}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-[11px] text-emerald-300 font-bold">
+                  تاريخ أول ماتش
+                  <input type="date" value={bkDate} onChange={(e) => setBkDate(e.target.value)} className="mt-1 w-full bg-[#0a140f] border border-emerald-800/60 rounded-lg p-2 text-sm text-white" />
+                </label>
+                <label className="text-[11px] text-emerald-300 font-bold">
+                  ميعاد أول ماتش
+                  <input type="time" value={bkTime} onChange={(e) => setBkTime(e.target.value)} className="mt-1 w-full bg-[#0a140f] border border-emerald-800/60 rounded-lg p-2 text-sm text-white" />
+                </label>
+              </div>
+              {bkStartAt && (
+                <p className="text-[11px] text-amber-300 font-bold">
+                  🔒 تشكيلات الحجز هتتقفل قبل أول ماتش بربع ساعة: {formatDeadline(bkStartAt - 15 * 60000)}
+                </p>
+              )}
               <button
                 type="button"
                 disabled={bkBusy || bkChosen.length < BOOKING_MIN_TEAMS || !bkFirst || !bkSecond}
                 onClick={async () => {
                   setBkBusy(true);
-                  const ok = await onStartBooking?.(bkChosen, bkFirst, bkSecond);
+                  const ok = await onStartBooking?.(bkChosen, bkFirst, bkSecond, bkStartAt ?? undefined);
                   setBkBusy(false);
                   if (ok) setActiveSection('live');
                 }}
@@ -734,6 +755,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           teams={teams}
           players={players}
           allRoundStats={allRoundStats}
+          bookingStats={bookingStats}
           onLiveUpdate={onLiveUpdate}
         />
       )}

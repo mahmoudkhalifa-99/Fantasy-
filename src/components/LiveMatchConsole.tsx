@@ -21,6 +21,7 @@ interface Props {
   teams: Record<string, Team>;
   players: Record<string, Player>;
   allRoundStats: Record<number, { p: Record<string, PlayerMatchStats> }>;
+  bookingStats?: { p: Record<string, PlayerMatchStats> };
   onLiveUpdate: (matchId: string, fn: Mutator) => void;
 }
 
@@ -36,7 +37,7 @@ const ACTIONS: { type: MatchEventType; label: string; icon: string; cls: string 
 const ICON: Record<string, string> = Object.fromEntries(ACTIONS.map((a) => [a.type, a.icon]));
 const LABEL: Record<string, string> = Object.fromEntries(ACTIONS.map((a) => [a.type, a.label]));
 
-export const LiveMatchConsole: React.FC<Props> = ({ matches, teams, players, allRoundStats, onLiveUpdate }) => {
+export const LiveMatchConsole: React.FC<Props> = ({ matches, teams, players, allRoundStats, bookingStats, onLiveUpdate }) => {
   const list = Object.values(matches).sort((a, b) => {
     const o = { live: 0, upcoming: 1, finished: 2 } as const;
     return o[a.status] - o[b.status] || a.round - b.round;
@@ -103,7 +104,7 @@ export const LiveMatchConsole: React.FC<Props> = ({ matches, teams, players, all
 
   const tA = teams[match.teamAId];
   const tB = teams[match.teamBId];
-  const stats: RoundPlayerStats = allRoundStats[match.round]?.p || {};
+  const stats: RoundPlayerStats = (match.booking ? bookingStats?.p : allRoundStats[match.round]?.p) || {};
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
   const run = (fn: Mutator) => onLiveUpdate(match.id, fn);

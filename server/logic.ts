@@ -1,14 +1,15 @@
 // منطق السيرفر المشترك (التحقق + الصلاحيات). بيتستخدم في server.ts المحلي وفي api/ على Vercel.
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { initialTournamentData } from './defaultData.js';
-import { deriveAllStats } from '../src/utils/deriveStats.js';
+import { deriveAllStats, deriveBookingStats } from '../src/utils/deriveStats.js';
 import { isRoundLocked } from '../src/utils/deadline.js';
+import { isBookingLocked } from '../src/utils/booking.js';
 import { chipUsedRound, effectiveBudget, findBaseSquad, transferInfo } from '../src/utils/transfers.js';
 
 export type Data = Record<string, any>;
 
 /** الحقول اللي المنظم بس يقدر يعدلها */
-export const ADMIN_FIELDS = ['cfg', 'teams', 'players', 'matches', 'stats', 'topStories', 'booking'] as const;
+export const ADMIN_FIELDS = ['cfg', 'teams', 'players', 'matches', 'stats', 'topStories', 'booking', 'bstats'] as const;
 const SQUAD_SIZE = 7;
 const POS = ['GK', 'DEF', 'MID', 'FWD'] as const;
 
@@ -215,10 +216,20 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
       if (prev) rounds[nextKey] = { ids: prev.ids, cap: prev.cap, form: prev.form ?? '2-2-2', tc: 0, pen: 0, auto: true };
     }
   }
+
+  // تشكيلة وضع الحجز: منفصلة تمامًا عن تشكيلات الجولات (مفيش تحويلات ولا كروت ولا قفل)
+  let bk = existing?.bk;
+  if (incoming?.bk) {
+    if (cfg.mode !== 'booking' || !main.booking?.active) return { error: 'وضع الحجز مش شغال دلوقتي' };
+    if (isBookingLocked(main.booking, main.matches)) return { error: 'تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)' };
+    const err = validateSquad(incoming.bk, main, Number(cfg.budget));
+    if (err) return { error: err };
+    bk = { ids: incoming.bk.ids, cap: incoming.bk.cap, form: String(incoming.bk.form ?? '2-2-2') };
+  }
   const phone = incoming?.phone !== undefined ? String(incoming.phone).replace(/[^\d+]/g, '').slice(0, 15) : existing?.phone;
   const joined = existing?.joined ?? (Number(incoming?.joined) || Date.now());
   const mail = email || existing?.email;
-  return { entry: { id: existing?.id ?? incoming.id, name, ...(phone ? { phone } : {}), ...(mail ? { email: mail } : {}), joined, rounds } };
+  return { entry: { id: existing?.id ?? incoming.id, name, ...(phone ? { phone } : {}), ...(mail ? { email: mail } : {}), joined, rounds, ...(bk ? { bk } : {}) } };
 }
 
 function findPrevSquad(rounds: Record<string, any>, editRound: number): any | null {
@@ -253,10 +264,10 @@ export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Resu
     if (!ctx.isAdmin) return { status: 403, json: { error: 'admin_required' } };
     const stories: Record<string, any> = {};
     for (const [k, v] of Object.entries((main.topStories ?? {}) as Record<string, any>)) if (v?.actionType !== 'live' && v?.actionType !== 'modal') stories[k] = v;
-    main = { ...main, teams: {}, players: {}, matches: {}, stats: {}, contacts: {}, booking: { active: false }, topStories: stories, cfg: { ...(main.cfg ?? {}), round: 1, locked: false } };
+    main = { ...main, teams: {}, players: {}, matches: {}, stats: {}, bstats: { p: {} }, contacts: {}, booking: { active: false }, topStories: stories, cfg: { ...(main.cfg ?? {}), round: 1, locked: false } };
     await st.setMain(main);
     // التشكيلات القديمة كانت على لاعبين تجريبيين: بنفضّيها ونسيب الحسابات (الاسم والموبايل) زي ما هي
-    for (const [uid, e] of Object.entries(await st.getEntries())) await st.setEntry(uid, { ...(e as Data), rounds: {} });
+    for (const [uid, e] of Object.entries(await st.getEntries())) { const { bk: _bk, ...rest } = e as Data; await st.setEntry(uid, { ...rest, rounds: {} }); }
     return { status: 200, json: { success: true, data: publicView(main, await st.getEntries(), ctx.isAdmin) } };
   }
 
@@ -267,7 +278,11 @@ export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Resu
     if (Object.values(adminUpdate).some((v) => !v || typeof v !== 'object')) return { status: 400, json: { error: 'Invalid payload' } };
     main = { ...main, ...adminUpdate };
     // إحصائيات اللاعبين بتتحسب تلقائيًا من المباريات كل ما المباريات تتحفظ
-    if (adminUpdate.matches) main.stats = deriveAllStats(main.matches, main.players, main.stats);
+    if (adminUpdate.matches) {
+      main.stats = deriveAllStats(main.matches, main.players, main.stats);
+      // إحصائيات وضع الحجز منفصلة عن إحصائيات الجولات
+      main.bstats = { p: deriveBookingStats(main.matches, main.players) };
+    }
     await st.setMain(main);
   }
 

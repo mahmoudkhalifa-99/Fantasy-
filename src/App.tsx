@@ -14,7 +14,7 @@ import { PLScreenLatest } from './components/PLScreenLatest';
 import { PLScreenFantasy } from './components/PLScreenFantasy';
 import { PLScreenSeason } from './components/PLScreenSeason';
 import { isRoundLocked } from './utils/deadline';
-import { BookingState, advanceBooking, createBooking, makeBookingMatch, undoBooking } from './utils/booking';
+import { BookingState, advanceBooking, bookingDeadlineMs, createBooking, isBookingLocked, makeBookingMatch, undoBooking } from './utils/booking';
 import { PLTransfersView } from './components/PLTransfersView';
 import { PlayersMarketView } from './components/PlayersMarketView';
 import { AdminPanel } from './components/AdminPanel';
@@ -28,7 +28,7 @@ import { PlayerPickerModal } from './components/PlayerPickerModal';
 import { RulesModal } from './components/RulesModal';
 import type { LiveState } from './utils/liveMatch';
 import { chipUsedRound, effectiveBudget, findBaseSquad } from './utils/transfers';
-import { deriveRoundStats } from './utils/deriveStats';
+import { deriveBookingStats, deriveRoundStats } from './utils/deriveStats';
 import { RegistrationModal } from './components/RegistrationModal';
 import {
   calculateSquadRoundPoints,
@@ -89,29 +89,39 @@ export default function App() {
   const [teams, setTeams] = useState<Record<string, Team>>({});
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [matches, setMatches] = useState<Record<string, Match>>({});
+  // وضع الحجز عالم منفصل تمامًا عن الوضع الأساسي (زي تابات Fantasy / Challenge في تطبيق الدوري الإنجليزي):
+  // المشترك هو اللي يبدّل بين "فانتازي الدورة" و"فانتازي الحجز" وكل واحد له مباريات وإحصائيات وتشكيلة.
+  const bookingActive = cfgRaw.mode === 'booking';
+  const [viewMode, setViewMode] = useState<'main' | 'booking'>('main');
+  const viewRef = useRef<'main' | 'booking'>('main');
+  const isBookingMode = bookingActive && viewMode === 'booking';
+  const mainMatches = useMemo(
+    () => Object.fromEntries(Object.entries(matches).filter(([, m]) => !m.booking)) as Record<string, Match>,
+    [matches]
+  );
+  const vMatches = useMemo(
+    () => (isBookingMode ? (Object.fromEntries(Object.entries(matches).filter(([, m]) => !!m.booking)) as Record<string, Match>) : mainMatches),
+    [matches, mainMatches, isBookingMode]
+  );
   // الديدلاين التلقائي: الجولة بتتقفل قبل أول ماتش بنص ساعة (أو لو المنظم قفلها يدوي)
   const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 30000);
     return () => clearInterval(t);
   }, []);
-  const cfgBase = useMemo<TournamentConfig>(() => ({ ...cfgRaw, locked: isRoundLocked(cfgRaw, matches, nowTick) }), [cfgRaw, matches, nowTick]);
+  const cfgBase = useMemo<TournamentConfig>(() => ({ ...cfgRaw, locked: isRoundLocked(cfgRaw, mainMatches, nowTick) }), [cfgRaw, mainMatches, nowTick]);
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   const [allRoundStats, setAllRoundStats] = useState<
     Record<number, { p: Record<string, PlayerMatchStats> }>
   >({});
 
+  // إحصائيات لاعبين وضع الحجز (منفصلة عن إحصائيات الجولات)
+  const [bookingStats, setBookingStats] = useState<{ p: Record<string, PlayerMatchStats> }>({ p: {} });
+
   // Current user info
   const [userId, setUserId] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
-
-  // الميزانية الفعلية: لو أسعار لاعبين تشكيلتك زادت، تكلفتها الجديدة هي الحد (زي الفانتازي)
-  const cfg = useMemo<TournamentConfig>(() => {
-    const editR = cfgBase.locked ? cfgBase.round + 1 : cfgBase.round;
-    const base = findBaseSquad(entries[userId]?.rounds, editR);
-    return { ...cfgBase, budget: effectiveBudget(cfgBase.budget, base, players) };
-  }, [cfgBase, entries, userId, players]);
 
   // Draft squad state
   const [squadIds, setSquadIds] = useState<string[]>([]);
@@ -119,6 +129,35 @@ export default function App() {
   const [formation, setFormation] = useState<string>('2-2-2');
   const [isDraftDirty, setIsDraftDirty] = useState<boolean>(false);
   const [booking, setBooking] = useState<BookingState | null>(null);
+
+  // ديدلاين تشكيلة الحجز: ربع ساعة قبل أول ماتش في الحجز
+  const bookingLocked = isBookingMode && isBookingLocked(booking, matches, nowTick);
+  const bookingDl = bookingDeadlineMs(booking);
+  const blockIfBookingLocked = () => {
+    if (!bookingLocked) return false;
+    showToast('🔒 تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)');
+    return true;
+  };
+
+  // ===== عدسة الوضع (اللي المشترك بيشوفه) =====
+  const bkRound = booking?.round ?? cfgRaw.round;
+  const vStats = useMemo<Record<number, { p: Record<string, PlayerMatchStats> }>>(
+    () => (isBookingMode ? { [bkRound]: bookingStats } : allRoundStats),
+    [isBookingMode, bkRound, bookingStats, allRoundStats]
+  );
+  const vEntries = useMemo<Record<string, Entry>>(() => {
+    if (!isBookingMode) return entries;
+    const out: Record<string, Entry> = {};
+    for (const [id, e] of Object.entries(entries)) out[id] = { ...e, rounds: e.bk ? { [bkRound]: e.bk } : {} };
+    return out;
+  }, [isBookingMode, bkRound, entries]);
+  // الميزانية الفعلية: لو أسعار لاعبين تشكيلتك زادت، تكلفتها الجديدة هي الحد (زي الفانتازي)
+  const cfg = useMemo<TournamentConfig>(() => {
+    const c: TournamentConfig = isBookingMode ? { ...cfgBase, round: bkRound, locked: false, autoLock: false } : cfgBase;
+    const editR = c.locked ? c.round + 1 : c.round;
+    const base = findBaseSquad(vEntries[userId]?.rounds, editR);
+    return { ...c, budget: effectiveBudget(c.budget, base, players) };
+  }, [cfgBase, isBookingMode, bkRound, vEntries, userId, players]);
   const [topStories, setTopStories] = useState<Record<string, TopStoryAd>>({});
 
   // Modals state
@@ -200,6 +239,7 @@ export default function App() {
       if (data.matches) setMatches(data.matches);
       if (data.entries) setEntries(data.entries);
       if (data.stats) setAllRoundStats(data.stats);
+      setBookingStats(data.bstats?.p ? data.bstats : { p: {} });
       setBooking(data.booking?.teamIds ? data.booking : null);
       if (data.topStories) setTopStories(data.topStories);
 
@@ -208,21 +248,40 @@ export default function App() {
       if (uid && data.entries && data.entries[uid]) {
         const uEntry = data.entries[uid];
         setUserName(uEntry.name || localStorage.getItem('fantasy_dawra_name') || '');
-        const activeR = isRoundLocked(data.cfg, data.matches) ? data.cfg.round + 1 : data.cfg.round;
-        let sq = uEntry.rounds[activeR];
-        if (!sq) {
-          for (let i = activeR - 1; i >= 1; i--) {
-            if (uEntry.rounds[i]) {
-              sq = uEntry.rounds[i];
-              break;
+        const bkMode = viewRef.current === 'booking' && data.cfg?.mode === 'booking';
+        if (bkMode) {
+          // وضع الحجز: تشكيلة منفصلة (entry.bk)، من غير كروت
+          const sq = uEntry.bk;
+          setActiveChip(null);
+          if (sq && sq.ids) {
+            setSquadIds(sq.ids);
+            setCaptainId(sq.cap || sq.ids[0] || '');
+            setFormation(sq.form || '2-2-2');
+          } else {
+            setSquadIds([]);
+            setCaptainId('');
+          }
+        } else {
+          const mainMatches = Object.fromEntries(Object.entries((data.matches || {}) as Record<string, Match>).filter(([, m]) => !m.booking));
+          const activeR = isRoundLocked(data.cfg, mainMatches) ? data.cfg.round + 1 : data.cfg.round;
+          let sq = uEntry.rounds[activeR];
+          if (!sq) {
+            for (let i = activeR - 1; i >= 1; i--) {
+              if (uEntry.rounds[i]) {
+                sq = uEntry.rounds[i];
+                break;
+              }
             }
           }
-        }
-        setActiveChip(uEntry.rounds[activeR]?.chip || null);
-        if (sq && sq.ids) {
-          setSquadIds(sq.ids);
-          setCaptainId(sq.cap || sq.ids[0] || '');
-          if (sq.form) setFormation(sq.form);
+          setActiveChip(uEntry.rounds[activeR]?.chip || null);
+          if (sq && sq.ids) {
+            setSquadIds(sq.ids);
+            setCaptainId(sq.cap || sq.ids[0] || '');
+            if (sq.form) setFormation(sq.form);
+          } else {
+            setSquadIds([]);
+            setCaptainId('');
+          }
         }
       } else {
         // حساب جديد: تشكيلة فاضية، المشترك هو اللي يختار لاعبينه
@@ -238,12 +297,37 @@ export default function App() {
     fetchData();
   }, []);
 
+  // تبديل الوجهة (فانتازي الدورة ⇄ فانتازي الحجز): كل وجهة ليها تشكيلتها
+  const switchView = (v: 'main' | 'booking') => {
+    if (v === viewRef.current) return;
+    if (isDraftDirty && !window.confirm('عندك تعديلات مش محفوظة في التشكيلة دي، هتتمسح لو بدّلت. تكمّل؟')) return;
+    viewRef.current = v;
+    setViewMode(v);
+    setIsDraftDirty(false);
+    setPlayerToReplaceId(null);
+    setIsPickerOpen(false);
+    setIsTransfersPageOpen(false);
+    setIsStandingsOpen(false);
+    fetchData();
+  };
+  // لو وضع الحجز خلص وإحنا واقفين فيه: نرجع للأساسي
+  useEffect(() => {
+    if (!bookingActive && viewRef.current === 'booking') {
+      viewRef.current = 'main';
+      setViewMode('main');
+      setIsDraftDirty(false);
+      fetchData();
+    }
+  }, [bookingActive]);
+
   // ---- التسجيل المباشر للمباراة ----
   const matchesRef = useRef(matches);
   const statsRef = useRef(allRoundStats);
+  const bstatsRef = useRef(bookingStats);
   const bookingRef = useRef<BookingState | null>(booking);
   matchesRef.current = matches;
   statsRef.current = allRoundStats;
+  bstatsRef.current = bookingStats;
   bookingRef.current = booking;
   const livePending = useRef(0);
   const liveQueue = useRef<Promise<void>>(Promise.resolve());
@@ -251,7 +335,8 @@ export default function App() {
   const handleLiveUpdate = (matchId: string, fn: (s: LiveState) => LiveState) => {
     const m = matchesRef.current[matchId];
     if (!m) return;
-    const roundDoc = statsRef.current[m.round] || { p: {} };
+    const isBk = !!m.booking;
+    const roundDoc = isBk ? bstatsRef.current : statsRef.current[m.round] || { p: {} };
     const r = fn({ match: m, stats: roundDoc.p || {} });
     let newMatches: Record<string, Match> = { ...matchesRef.current, [matchId]: r.match };
 
@@ -279,12 +364,19 @@ export default function App() {
       bookingRef.current = newBooking;
       setBooking(newBooking);
     }
-    const derived = deriveRoundStats(m.round, newMatches, players, r.stats);
-    const newStats = { ...statsRef.current, [m.round]: { ...roundDoc, p: derived } };
     matchesRef.current = newMatches;
-    statsRef.current = newStats;
     setMatches(newMatches);
-    setAllRoundStats(newStats);
+    if (isBk) {
+      // إحصائيات الحجز في مكان منفصل عن إحصائيات الجولات
+      const newB = { p: deriveBookingStats(newMatches, players) };
+      bstatsRef.current = newB;
+      setBookingStats(newB);
+    } else {
+      const derived = deriveRoundStats(m.round, newMatches, players, r.stats);
+      const newStats = { ...statsRef.current, [m.round]: { ...roundDoc, p: derived } };
+      statsRef.current = newStats;
+      setAllRoundStats(newStats);
+    }
 
     livePending.current++;
     liveQueue.current = liveQueue.current.then(async () => {
@@ -292,7 +384,7 @@ export default function App() {
         const res = await fetch('/api/tournament/data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-          body: JSON.stringify({ matches: matchesRef.current, stats: statsRef.current, ...(bookingRef.current ? { booking: bookingRef.current } : {}) }),
+          body: JSON.stringify({ matches: matchesRef.current, stats: statsRef.current, bstats: bstatsRef.current, ...(bookingRef.current ? { booking: bookingRef.current } : {}) }),
         });
         if (!res.ok) throw new Error(String(res.status));
       } catch {
@@ -315,6 +407,7 @@ export default function App() {
         const data = await res.json();
         if (data.matches) setMatches(data.matches);
         if (data.stats) setAllRoundStats(data.stats);
+        setBookingStats(data.bstats?.p ? data.bstats : { p: {} });
         if (data.cfg) setCfg(data.cfg);
         setBooking(data.booking?.teamIds ? data.booking : null);
         if (data.topStories) setTopStories(data.topStories);
@@ -363,6 +456,7 @@ export default function App() {
         if (json.data.matches) setMatches(json.data.matches);
         if (json.data.entries) setEntries(json.data.entries);
         if (json.data.stats) setAllRoundStats(json.data.stats);
+        setBookingStats(json.data.bstats?.p ? json.data.bstats : { p: {} });
         setBooking(json.data.booking?.teamIds ? json.data.booking : null);
         if (json.data.topStories) setTopStories(json.data.topStories);
       }
@@ -376,32 +470,39 @@ export default function App() {
 
   // Squad actions
   const handleSaveSquad = async () => {
+    if (blockIfBookingLocked()) return;
     const check = validateSquad(squadIds, captainId, players, cfg, formation);
     if (!check.isValid) {
       showToast(`⚠️ ${check.errors[0]}`);
       return;
     }
     const activeEditingRound = cfg.locked ? cfg.round + 1 : cfg.round;
-    const updatedUserEntry: Entry = {
+    const baseEntry = {
       id: userId,
       name: userName || localStorage.getItem('fantasy_dawra_name') || '',
       ...(userPhone ? { phone: userPhone } : {}),
       joined: entries[userId]?.joined || Date.now(),
-      rounds: {
-        ...(entries[userId]?.rounds || {}),
-        [activeEditingRound]: {
-          ids: [...squadIds],
-          cap: captainId,
-          form: formation,
-          ...(activeChip ? { chip: activeChip } : {}),
-        },
-      },
     };
+    // وضع الحجز: بنحفظ في تشكيلة الحجز المنفصلة (bk) ومنلمسش تشكيلات الجولات
+    const updatedUserEntry: Entry = isBookingMode
+      ? { ...baseEntry, rounds: {}, bk: { ids: [...squadIds], cap: captainId, form: formation } }
+      : {
+          ...baseEntry,
+          rounds: {
+            ...(entries[userId]?.rounds || {}),
+            [activeEditingRound]: {
+              ids: [...squadIds],
+              cap: captainId,
+              form: formation,
+              ...(activeChip ? { chip: activeChip } : {}),
+            },
+          },
+        };
 
     const success = await syncServerData({ entry: updatedUserEntry });
     if (success) {
       setIsDraftDirty(false);
-      showToast(`✅ تم حفظ تشكيلة الجولة ${activeEditingRound} بنجاح!`);
+      showToast(isBookingMode ? '✅ تم حفظ تشكيلة الحجز بنجاح!' : `✅ تم حفظ تشكيلة الجولة ${activeEditingRound} بنجاح!`);
     }
   };
 
@@ -434,6 +535,7 @@ export default function App() {
   };
 
   const handleSelectPlayer = (player: Player) => {
+    if (blockIfBookingLocked()) return;
     if (playerToReplaceId) {
       const nextSquad = squadIds.map((id) => (id === playerToReplaceId ? player.id : id));
       setSquadIds(nextSquad);
@@ -453,6 +555,7 @@ export default function App() {
   };
 
   const handleRemovePlayer = (pid: string) => {
+    if (blockIfBookingLocked()) return;
     const nextSquad = squadIds.filter((id) => id !== pid);
     setSquadIds(nextSquad);
     if (captainId === pid) {
@@ -462,6 +565,7 @@ export default function App() {
   };
 
   const handleSetCaptain = (pid: string) => {
+    if (blockIfBookingLocked()) return;
     setCaptainId(pid);
     setIsDraftDirty(true);
     showToast(`⭐ تم اختيار ${players[pid]?.name || 'اللاعب'} كابتن (x2)!`);
@@ -492,8 +596,8 @@ export default function App() {
   };
 
   // وضع الحجز
-  const handleStartBooking = async (teamIds: string[], first: string, second: string): Promise<boolean> => {
-    const nb = createBooking(teamIds, first, second, cfg.round);
+  const handleStartBooking = async (teamIds: string[], first: string, second: string, startAt?: number): Promise<boolean> => {
+    const nb = createBooking(teamIds, first, second, cfg.round, startAt);
     if (typeof nb === 'string') {
       showToast(`⚠️ ${nb}`);
       return false;
@@ -505,13 +609,17 @@ export default function App() {
     return ok;
   };
 
+  // إنهاء وضع الحجز: بيرجّع الوضع الأساسي، وبيصفّر كل حاجة في الحجز (المباريات، إجماليات الفرق، ونقاط اللاعبين)
   const handleEndBooking = async () => {
     if (!booking) return;
-    const rest = { ...matches };
-    const cur = booking.currentMatchId ? rest[booking.currentMatchId] : undefined;
-    if (cur && cur.status === 'upcoming') delete rest[cur.id]; // المباراة اللي ماتلعبتش بتتشال
-    if (await syncServerData({ booking: { ...booking, active: false, currentMatchId: undefined }, matches: rest, cfg: { ...cfgRaw, mode: 'tournament' } }))
-      showToast('تم إنهاء وضع الحجز (الإجماليات محفوظة)');
+    const rest = Object.fromEntries(Object.entries(matches).filter(([, m]) => !m.booking)) as Record<string, Match>;
+    const ok = await syncServerData({
+      booking: { active: false },
+      matches: rest,
+      bstats: { p: {} },
+      cfg: { ...cfgRaw, mode: 'tournament' },
+    });
+    if (ok) showToast('تم إنهاء وضع الحجز وتصفير الإجماليات والنقاط');
   };
 
   const handleSaveTopStories = async (next: Record<string, TopStoryAd>): Promise<boolean> => {
@@ -706,6 +814,7 @@ export default function App() {
             players={players}
             matches={matches}
             allRoundStats={allRoundStats}
+            bookingStats={bookingStats}
             onUpdateConfig={handleUpdateConfig}
             onAddTeam={handleAddTeam}
             onUpdateTeam={handleUpdateTeam}
@@ -756,18 +865,18 @@ export default function App() {
           cfg={cfg}
           teams={teams}
           players={players}
-          matches={matches}
-          allRoundStats={allRoundStats}
+          matches={vMatches}
+          allRoundStats={vStats}
           squadIds={squadIds}
           captainId={captainId}
           formation={formation}
-          entries={entries}
+          entries={vEntries}
           editRound={cfg.locked ? cfg.round + 1 : cfg.round}
-          baseIds={findBaseSquad(entries[userId]?.rounds, cfg.locked ? cfg.round + 1 : cfg.round)}
+          baseIds={findBaseSquad(vEntries[userId]?.rounds, cfg.locked ? cfg.round + 1 : cfg.round)}
           activeChip={activeChip}
           chipsUsed={{
-            wildcard: chipUsedRound(entries[userId]?.rounds, 'wildcard', cfg.locked ? cfg.round + 1 : cfg.round),
-            freehit: chipUsedRound(entries[userId]?.rounds, 'freehit', cfg.locked ? cfg.round + 1 : cfg.round),
+            wildcard: chipUsedRound(vEntries[userId]?.rounds, 'wildcard', cfg.locked ? cfg.round + 1 : cfg.round),
+            freehit: chipUsedRound(vEntries[userId]?.rounds, 'freehit', cfg.locked ? cfg.round + 1 : cfg.round),
           }}
           onChipChange={(c) => {
             setActiveChip(c);
@@ -793,10 +902,10 @@ export default function App() {
         />
       ) : isStandingsOpen ? (
         <PLStandingsView
-          entries={entries}
+          entries={vEntries}
           players={players}
           cfg={cfg}
-          allRoundStats={allRoundStats}
+          allRoundStats={vStats}
           currentUserId={userId}
           onBack={() => setIsStandingsOpen(false)}
         />
@@ -852,9 +961,9 @@ export default function App() {
               <PLScreenLatest
                 matches={matches}
                 teams={teams}
-                cfg={cfg}
+                cfg={cfgBase}
                 topStories={topStories}
-                onOpenAdBooking={cfg.adsWhatsapp || cfg.adsPhone ? () => setIsBookingAdOpen(true) : undefined}
+                onOpenAdBooking={cfgBase.adsWhatsapp || cfgBase.adsPhone ? () => setIsBookingAdOpen(true) : undefined}
                 onNavigateToFantasy={() => setCurrentTab('fantasy')}
                 onNavigateToSeason={() => setCurrentTab('season')}
                 onSelectMatch={(m) => {
@@ -864,34 +973,56 @@ export default function App() {
             )}
 
             {/* SCREEN 2: FANTASY (فانتازي الدورة - As in Screenshot 2) */}
+            {currentTab === 'fantasy' && bookingActive && (
+              <div className="flex p-1 mb-3 rounded-2xl bg-gray-200/80 dark:bg-emerald-950/80 border border-emerald-900/30" dir="rtl">
+                {([
+                  ['main', '🏆 فانتازي الدورة'],
+                  ['booking', '⚽ فانتازي الحجز'],
+                ] as const).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => switchView(k)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-black transition-all ${
+                      viewMode === k ? 'bg-white text-emerald-900 shadow' : 'text-gray-600 dark:text-emerald-300 hover:text-emerald-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             {currentTab === 'fantasy' && (
               <PLScreenFantasy
                 cfg={cfg}
                 teams={teams}
                 players={players}
-                entries={entries}
-                allRoundStats={allRoundStats}
+                entries={vEntries}
+                allRoundStats={vStats}
                 currentUserId={userId}
                 userName={userName}
-                matches={matches}
+                matches={vMatches}
                 squadIds={squadIds}
                 captainId={captainId}
                 formation={formation}
                 isDraftDirty={isDraftDirty}
                 onOpenPickTeamModal={() => {
+                  if (blockIfBookingLocked()) return;
                   setPlayerToReplaceId(null);
                   setPickerTargetPos('ALL');
                   setIsPickerOpen(true);
                 }}
                 onOpenTransfersModal={() => {
+                  if (blockIfBookingLocked()) return;
                   setIsTransfersPageOpen(true);
                 }}
                 onOpenTransfersPage={() => {
+                  if (blockIfBookingLocked()) return;
                   setIsTransfersPageOpen(true);
                 }}
                 onOpenStandings={() => setIsStandingsOpen(true)}
                 myStanding={(() => {
-                  const st = computeStandings(entries, players, allRoundStats, cfg);
+                  const st = computeStandings(vEntries, players, vStats, cfg);
                   const me = st.rows.find((r) => r.entry.id === userId);
                   return me ? { rank: me.rank, total: me.total, participants: st.rows.length } : null;
                 })()}
@@ -899,17 +1030,22 @@ export default function App() {
                 onSetCaptain={handleSetCaptain}
                 onRemovePlayer={handleRemovePlayer}
                 onReplacePlayer={(pid) => {
+                  if (blockIfBookingLocked()) return;
                   setPlayerToReplaceId(pid);
                   setPickerTargetPos(players[pid]?.pos || 'ALL');
                   setIsPickerOpen(true);
                 }}
                 onSlotClick={(pos) => {
+                  if (blockIfBookingLocked()) return;
                   setPlayerToReplaceId(null);
                   setPickerTargetPos(pos);
                   setIsPickerOpen(true);
                 }}
                 onNavigateToMatches={() => setCurrentTab('season')}
                 onRenameTeam={handleRenameTeam}
+                bookingMode={isBookingMode}
+                bookingLocked={bookingLocked}
+                bookingDeadline={bookingDl}
               />
             )}
 
@@ -919,7 +1055,7 @@ export default function App() {
                 matches={matches}
                 teams={teams}
                 players={players}
-                cfg={cfg}
+                cfg={cfgBase}
                 allRoundStats={allRoundStats}
                 entries={entries}
                 currentUserId={userId}
@@ -1036,9 +1172,9 @@ export default function App() {
         teams={teams}
         cfg={cfg}
         formation={formation}
-        allRoundStats={allRoundStats}
-        matches={matches}
-        entries={entries}
+        allRoundStats={vStats}
+        matches={vMatches}
+        entries={vEntries}
       />
 
       {/* Rules Modal */}

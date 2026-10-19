@@ -56,6 +56,9 @@ interface PLScreenFantasyProps {
   onSlotClick: (pos: Position) => void;
   onNavigateToMatches: () => void;
   onRenameTeam?: (name: string) => Promise<boolean> | boolean;
+  bookingMode?: boolean;
+  bookingLocked?: boolean;
+  bookingDeadline?: number | null;
 }
 
 export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
@@ -83,6 +86,9 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   onSlotClick,
   onNavigateToMatches,
   onRenameTeam,
+  bookingMode = false,
+  bookingLocked = false,
+  bookingDeadline = null,
 }) => {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -166,7 +172,13 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   // موعد قفل التشكيلة = أول ماتش في الجولة اللي بتتعدّل (من الجدول الفعلي)
   const editRound = cfg.locked ? cfg.round + 1 : cfg.round;
   const dlMs = roundDeadlineMs(matches, editRound, cfg);
-  const deadlineText = cfg.locked
+  const deadlineText = bookingMode
+    ? bookingLocked
+      ? '🔒 تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)'
+      : bookingDeadline
+      ? `الديدلاين: ${formatDeadline(bookingDeadline)}`
+      : 'التعديل مفتوح لحد ما أول ماتش في الحجز يبدأ'
+    : cfg.locked
     ? `الجولة ${cfg.round} اتقفلت، تعديلك دلوقتي للجولة ${editRound}${dlMs ? ` (يقفل ${formatDeadline(dlMs)})` : ''}`
     : dlMs
     ? `الديدلاين: ${formatDeadline(dlMs)}`
@@ -261,7 +273,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
           {/* Gameweek Points Summary (Average | Points | Highest) */}
           <div className="text-center pt-1">
             <span className="text-xs font-bold text-white/90 tracking-wide uppercase">
-              Gameweek {cfg.round} • الجولة {cfg.round}
+              {bookingMode ? 'فانتازي الحجز • Booking' : `Gameweek ${cfg.round} • الجولة ${cfg.round}`}
             </span>
 
             {/* Interactive 3-box Grid: Click Highest to show dream team / top squad, Average for average squad */}
@@ -325,7 +337,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
           <div className="pt-2">
             <div className="w-16 h-0.5 bg-white/40 mx-auto mb-3" />
             <div className="text-center text-xs space-y-0.5">
-              <div className="font-bold text-white/90">الجولة القادمة • Gameweek {cfg.round + 1}</div>
+              {!bookingMode && <div className="font-bold text-white/90">الجولة القادمة • Gameweek {cfg.round + 1}</div>}
               <div className="text-xs sm:text-sm font-black text-amber-200">
                 {deadlineText}
               </div>

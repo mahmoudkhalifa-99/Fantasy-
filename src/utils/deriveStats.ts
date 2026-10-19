@@ -14,23 +14,42 @@ function findPlayer(list: Player[], rawName: string): Player | undefined {
   return list.find((p) => norm(p.name) === n) || list.find((p) => sameName(norm(p.name), n));
 }
 
+/**
+ * إحصائيات الوضع الأساسي لجولة: مباريات الحجز (booking) مبتدخلش هنا خالص، ليها إحصائياتها المنفصلة (deriveBookingStats).
+ * لو فيه مباريات حجز في الجولة دي، بنصفّر لاعبي فرقها هنا عشان أي نقاط قديمة اتحسبت بالغلط تتشال.
+ */
 export function deriveRoundStats(
   round: number,
   matches: Record<string, Match>,
   players: Record<string, Player>,
   existing: RoundStats = {}
 ): RoundStats {
-  const roundMatches = Object.values(matches).filter((m) => m.round === round);
-  if (!roundMatches.length) return existing;
+  const inRound = Object.values(matches).filter((m) => m.round === round);
+  const roundMatches = inRound.filter((m) => !m.booking);
+  const strayTeams = new Set<string>();
+  for (const m of inRound) if (m.booking) [m.teamAId, m.teamBId].forEach((t) => strayTeams.add(t));
+  if (!roundMatches.length && !strayTeams.size) return existing;
+  return deriveFromList(roundMatches, players, existing, strayTeams);
+}
 
+/** إحصائيات وضع الحجز: بتتحسب من كل مباريات الحجز بس، منفصلة تمامًا عن جولات الوضع الأساسي. */
+export function deriveBookingStats(matches: Record<string, Match> | undefined, players: Record<string, Player> | undefined): RoundStats {
+  const list = Object.values(matches ?? {}).filter((m) => m.booking);
+  if (!list.length || !players) return {};
+  return deriveFromList(list, players, {}, new Set());
+}
+
+function deriveFromList(roundMatches: Match[], players: Record<string, Player>, existing: RoundStats, extraResetTeams: Set<string>): RoundStats {
   const all = Object.values(players);
   const byTeam = (tid: string) => all.filter((p) => p.teamId === tid);
   const out: RoundStats = { ...existing };
 
   // تصفير الإحصائيات المحسوبة للاعبي الفرق اللي عندها ماتش في الجولة دي
-  for (const m of roundMatches)
-    for (const tid of [m.teamAId, m.teamBId])
-      for (const p of byTeam(tid)) out[p.id] = { ...(existing[p.id] || {}), pl: 0, g: 0, a: 0, yc: 0, rc: 0, og: 0, pm: 0, ps: 0, cs: 0, mo: 0 };
+  const zero = (tid: string) => {
+    for (const p of byTeam(tid)) out[p.id] = { ...(existing[p.id] || {}), pl: 0, g: 0, a: 0, yc: 0, rc: 0, og: 0, pm: 0, ps: 0, cs: 0, mo: 0 };
+  };
+  for (const m of roundMatches) for (const tid of [m.teamAId, m.teamBId]) zero(tid);
+  extraResetTeams.forEach(zero);
 
   const add = (id: string | undefined, f: keyof PlayerMatchStats, n = 1) => {
     if (!id || !out[id]) return;
@@ -115,6 +134,10 @@ export function deriveAllStats(matches: Record<string, Match> | undefined, playe
   const next: AllStats = { ...(stats || {}) };
   if (!matches || !players) return next;
   const rounds = new Set(Object.values(matches).map((m) => m.round));
-  for (const r of rounds) next[r] = { ...(next[r] || {}), p: deriveRoundStats(r, matches, players, next[r]?.p || {}) } as any;
+  for (const r of rounds) {
+    // جولة فيها مباريات حجز بس ومفيش لها إحصائيات: منعملهاش جولة وهمية
+    if (!next[r] && !Object.values(matches).some((m) => m.round === r && !m.booking)) continue;
+    next[r] = { ...(next[r] || {}), p: deriveRoundStats(r, matches, players, next[r]?.p || {}) } as any;
+  }
   return next;
 }
