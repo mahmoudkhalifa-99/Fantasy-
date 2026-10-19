@@ -1,6 +1,6 @@
 import React from 'react';
-import { X, Trophy, Shield, Flame, AlertTriangle } from 'lucide-react';
-import { SCORING_MATRIX } from '../utils/fantasyScoring';
+import { X, Trophy, Shield, Flame, AlertTriangle, Crown } from 'lucide-react';
+import { SCORING_MATRIX, BENCH_SIZE } from '../utils/fantasyScoring';
 
 interface RulesModalProps {
   isOpen: boolean;
@@ -43,6 +43,39 @@ export const RulesModal: React.FC<RulesModalProps> = ({
 
         {/* Rules Body */}
         <div className="p-4 overflow-y-auto space-y-4 text-xs sm:text-sm">
+          {/* How to play */}
+          <div className="bg-[#0b160f] p-3 rounded-xl border border-emerald-800/50 space-y-1.5">
+            <h4 className="font-bold text-amber-300 flex items-center gap-1.5 text-xs">
+              <Trophy className="w-4 h-4" />
+              طريقة اللعب
+            </h4>
+            <ol className="list-decimal list-inside space-y-1 text-emerald-200 text-xs">
+              <li>سجّل حساب (الاسم + الموبايل + الإيميل).</li>
+              <li>اختار <b>7 لاعبين</b> (حارس + 6) في حدود الميزانية <b>{budget} مليون</b> وبالخطة اللي تعجبك.</li>
+              <li>اختار <b>كابتن</b> من تشكيلتك، وتقدر تختار <b>دكة احتياطي ({BENCH_SIZE} لاعبين: مدافع + وسط + مهاجم)</b>.</li>
+              <li>احفظ التشكيلة <b>قبل قفل الجولة</b>. بعد القفل مفيش تعديل لحد الجولة اللي بعدها.</li>
+              <li>مع انتهاء المباريات، نقاط لاعبينك بتتحسب تلقائيًا وبتتجمع في ترتيبك العام.</li>
+              <li><b>الدكة:</b> لو لاعب أساسي (غير الحارس) مالعبش، الاحتياطي في نفس مركزه بياخد مكانه وبتتحسب نقاطه لو لعب.</li>
+            </ol>
+          </div>
+
+          {/* Captain badge */}
+          <div className="bg-[#0b160f] p-3 rounded-xl border border-emerald-800/50 space-y-2">
+            <h4 className="font-bold text-amber-300 flex items-center gap-1.5 text-xs">
+              <Crown className="w-4 h-4" />
+              الكابتن وشارته
+            </h4>
+            <div className="flex items-center gap-3">
+              <span className="bg-amber-400 text-amber-950 text-xs font-black rounded-full w-6 h-6 flex items-center justify-center border-2 border-emerald-950 shadow-md shrink-0">C</span>
+              <p className="text-emerald-200 text-xs">دايرة <b>صفراء</b> عليها حرف <b>C</b> بتظهر على القميص (فوق يمينه) للاعب الكابتن.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="w-6 h-6 rounded-full flex items-center justify-center bg-amber-400 text-amber-950 ring-2 ring-amber-300 shrink-0"><Crown className="w-3.5 h-3.5" /></span>
+              <p className="text-emerald-200 text-xs">زرار <b>التاج</b> فوق يسار اللاعب: دوس عليه تخلّيه كابتن (الأصفر معناه إنه الكابتن الحالي).</p>
+            </div>
+            <p className="text-emerald-200 text-xs">نقاط الكابتن بتتضاعف <b>(x2)</b> في الجولة، ومثال: لاعب جاب 9 نقاط ككابتن بيحسبلك <b>18</b>.</p>
+          </div>
+
           {/* Main Principles */}
           <div className="bg-[#0b160f] p-3 rounded-xl border border-emerald-800/50 space-y-1.5">
             <h4 className="font-bold text-amber-300 flex items-center gap-1.5 text-xs">
