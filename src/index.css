@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* التطبيق داكن دائمًا (هوية Tahway League) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-emerald-400: #34e07f;
+  --color-emerald-500: #19d463;
+  --color-emerald-600: #12b052;
+  --color-amber-400: #efbb51;
+}
+
+@layer utilities {
+  .font-lalezar {
+    font-family: 'Lalezar', 'Cairo', system-ui, sans-serif;
+  }
+  .font-cairo {
+    font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #04100c;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1b4d32;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #276f47;
+}
+
+/* Hide scrollbar for tabs */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* شاشة البداية */
+@keyframes brand-pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes brand-load { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.brand-pop { animation: brand-pop .9s cubic-bezier(.2,.8,.2,1) both; }
+.brand-load { animation: brand-load 1.4s ease-in-out both; }

@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // كل التعامل مع Firestore بيتم من السيرفر (Vercel) بحساب الخدمة، وده بيتخطى القواعد.
+    // المتصفح ممنوع يقرأ أو يكتب مباشرة، عشان محدش يعدّل بيانات الدورة أو تشكيلة غيره بالـ API Key العام.
+    // الصلاحيات الفعلية (بيطبقها السيرفر):
+    //   tournament/main  → تعديل الفرق واللاعبين والمباريات والنتائج: khalifa@fantasy.com بس
+    //   entries/{uid}    → المشترك يحفظ تشكيلته هو بس (uid حسابه)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,8 +1,7 @@
 // سيرفر التطوير المحلي فقط (npm run dev). على Vercel بيتم استخدام api/ بدلًا منه.
 import express from 'express';
 import path from 'path';
-import { adminConfigured, bearerOf, checkAdmin, firebaseApiKey, handleGet, handlePost, resolveAdmin, verifyBearer } from './server/logic.js';
-import { createFileStorage } from './server/fileStorage.js';
+import { bearerOf, checkAdmin, handleGet, handlePost, resolveAdmin, verifyBearer } from './server/logic.js';
 import { createFirestoreStorage, serviceAccountFromEnv } from './server/firestoreStorage.js';
 
 try {
@@ -14,7 +13,11 @@ try {
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const sa = serviceAccountFromEnv();
-const storage = sa ? createFirestoreStorage(sa) : createFileStorage(); // Firestore لو FIREBASE_SERVICE_ACCOUNT مضبوط، وإلا data/tournament.json
+if (!sa) {
+  console.error('FIREBASE_SERVICE_ACCOUNT مش مضبوط في .env: التخزين كله على Firebase Firestore ومحتاج مفتاح حساب الخدمة.');
+  process.exit(1);
+}
+const storage = createFirestoreStorage(sa);
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -24,10 +27,13 @@ const header = (req: express.Request, name: string) => {
 };
 const ctxOf = async (req: express.Request) => {
   const bearer = bearerOf(header(req, 'authorization'));
+  const u = await verifyBearer(bearer);
   return {
-    isAdmin: await resolveAdmin({ key: header(req, 'x-admin-key'), bearer }),
+    isAdmin: await resolveAdmin({ bearer }),
     token: header(req, 'x-user-token'),
-    uid: (await verifyBearer(bearer))?.uid ?? null,
+    uid: u?.uid ?? null,
+    email: u?.email ?? null,
+    name: u?.name ?? null,
   };
 };
 
@@ -47,7 +53,7 @@ app.post('/api/tournament/data', async (req, res) => {
     res.status(r.status).json(r.json);
   } catch (err) {
     console.error('Save error:', err);
-    res.status(500).json({ error: 'Failed to update tournament data' });
+    res.status(500).json({ error: 'Failed to update tournament data', detail: String((err as Error)?.message || err).slice(0, 300) });
   }
 });
 
@@ -77,7 +83,6 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
-    if (!adminConfigured()) console.log(firebaseApiKey() ? 'تنبيه: ADMIN_EMAILS غير مضبوط، دخول المنظم مقفول.' : 'تنبيه: ADMIN_KEY غير مضبوط، لوحة المنظم مفتوحة محليًا.');
   });
 }
 
