@@ -135,6 +135,7 @@ export default function App() {
   const [formation, setFormation] = useState<string>('2-2-2');
   const [isDraftDirty, setIsDraftDirty] = useState<boolean>(false);
   const [booking, setBooking] = useState<BookingState | null>(null);
+  const [bookingArchive, setBookingArchive] = useState<{ booking: BookingState; matches: Record<string, Match>; endedAt: number } | null>(null);
 
   // ديدلاين تشكيلة الحجز: ربع ساعة قبل أول ماتش في الحجز
   const bookingLocked = isBookingMode && isBookingLocked(booking, matches, nowTick);
@@ -247,6 +248,7 @@ export default function App() {
       if (data.stats) setAllRoundStats(data.stats);
       setBookingStats(data.bstats?.p ? data.bstats : { p: {} });
       setBooking(data.booking?.teamIds ? data.booking : null);
+      setBookingArchive(data.bookingArchive?.booking ? data.bookingArchive : null);
       if (data.topStories) setTopStories(data.topStories);
 
       // أول دخول: لو الحجز جاهز، ادخل على فانتازي الحجز علطول (مش فانتازي الدورة)
@@ -431,6 +433,7 @@ export default function App() {
         setBookingStats(data.bstats?.p ? data.bstats : { p: {} });
         if (data.cfg) setCfg(data.cfg);
         setBooking(data.booking?.teamIds ? data.booking : null);
+        setBookingArchive(data.bookingArchive?.booking ? data.bookingArchive : null);
         if (data.topStories) setTopStories(data.topStories);
       } catch {
         /* تجاهل أخطاء الشبكة المؤقتة */
@@ -479,6 +482,7 @@ export default function App() {
         if (json.data.stats) setAllRoundStats(json.data.stats);
         setBookingStats(json.data.bstats?.p ? json.data.bstats : { p: {} });
         setBooking(json.data.booking?.teamIds ? json.data.booking : null);
+        setBookingArchive(json.data.bookingArchive?.booking ? json.data.bookingArchive : null);
         if (json.data.topStories) setTopStories(json.data.topStories);
       }
       return true;
@@ -679,13 +683,30 @@ export default function App() {
   const handleEndBooking = async () => {
     if (!booking) return;
     const rest = Object.fromEntries(Object.entries(matches).filter(([, m]) => !m.booking)) as Record<string, Match>;
+    const bkMatches = Object.fromEntries(Object.entries(matches).filter(([, m]) => m.booking)) as Record<string, Match>;
     const ok = await syncServerData({
       booking: { active: false },
       matches: rest,
       bstats: { p: {} },
+      // نسخة من الحجز اللي اتقفل عشان المنظم يقدر يرجّعه
+      bookingArchive: { booking, matches: bkMatches, endedAt: Date.now() },
       cfg: { ...cfgRaw, mode: 'tournament' },
     });
-    if (ok) showToast('تم إنهاء وضع الحجز وتصفير الإجماليات والنقاط');
+    if (ok) showToast('تم إنهاء وضع الحجز. تقدر ترجّعه من تبويب الحجز');
+  };
+
+  // استرجاع آخر حجز اتقفل (الترتيب والمباريات والنقاط)
+  const handleRestoreBooking = async (): Promise<boolean> => {
+    if (booking?.active || !bookingArchive?.booking) return false;
+    const restoredMatches = { ...matches, ...bookingArchive.matches };
+    const ok = await syncServerData({
+      booking: { ...bookingArchive.booking, active: true },
+      matches: restoredMatches,
+      bookingArchive: {},
+      cfg: { ...cfgRaw, mode: 'booking' },
+    });
+    if (ok) showToast('✅ اتسترجع الحجز بترتيبه ونتايجه');
+    return ok;
   };
 
   const handleSaveTopStories = async (next: Record<string, TopStoryAd>): Promise<boolean> => {
@@ -874,6 +895,8 @@ export default function App() {
             booking={booking}
             onStartBooking={handleStartBooking}
             onEndBooking={handleEndBooking}
+            bookingArchive={bookingArchive}
+            onRestoreBooking={handleRestoreBooking}
             entries={entries}
             cfg={cfgRaw}
             teams={teams}
