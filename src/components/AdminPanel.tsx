@@ -30,6 +30,8 @@ interface AdminPanelProps {
   booking?: BookingState | null;
   onStartBooking?: (teamIds: string[], first: string, second: string, startAt?: number) => Promise<boolean>;
   onEndBooking?: () => Promise<void> | void;
+  bookingArchive?: { booking: BookingState; matches: Record<string, Match>; endedAt: number } | null;
+  onRestoreBooking?: () => Promise<boolean> | boolean;
   entries?: Record<string, Entry>;
   cfg: TournamentConfig;
   teams: Record<string, Team>;
@@ -59,6 +61,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   booking = null,
   onStartBooking,
   onEndBooking,
+  bookingArchive = null,
+  onRestoreBooking,
   entries = {},
   cfg,
   teams,
@@ -490,7 +494,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 type="button"
                 disabled={bkBusy}
                 onClick={async () => {
-                  if (!window.confirm('إنهاء وضع الحجز؟ هيتصفّر كل حاجة في الحجز: إجماليات الفرق ونقاط اللاعبين والمباريات. تشكيلات الوضع الأساسي مش هتتأثر.')) return;
+                  if (!window.confirm('إنهاء وضع الحجز؟ الترتيب والمباريات هتتشال من الشاشة، لكن هتتحفظ نسخة منها وتقدر ترجّعها من تبويب الحجز (آخر حجز بس). تشكيلات الوضع الأساسي مش هتتأثر.')) return;
                   setBkBusy(true);
                   await onEndBooking?.();
                   setBkBusy(false);
@@ -502,6 +506,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           ) : (
             <div className="space-y-3">
+              {bookingArchive?.booking && (() => {
+                const arch = bookingArchive;
+                const rows = bookingTotals(arch.matches, arch.booking);
+                const nm = (id: string) => teams[id]?.name || '—';
+                return (
+                  <div className="bg-[#0a140f] border border-amber-500/40 rounded-xl p-3 space-y-2">
+                    <div className="text-amber-300 font-black text-xs">آخر حجز اتقفل ({new Date(arch.endedAt).toLocaleString('ar-EG')})</div>
+                    <div className="space-y-1">
+                      {rows.map((r, i) => (
+                        <div key={r.teamId} className="flex items-center justify-between text-xs text-white">
+                          <span className="font-bold">{i + 1}. {nm(r.teamId)}</span>
+                          <span className="text-emerald-300 font-mono">{r.pts} نقطة · لعب {r.played} · فوز {r.won}</span>
+                        </div>
+                      ))}
+                      {rows.length === 0 && <div className="text-xs text-emerald-400">مفيش مباريات منتهية في النسخة دي.</div>}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={bkBusy}
+                      onClick={async () => {
+                        if (!window.confirm('استرجاع الحجز اللي اتقفل؟ هيرجع بترتيبه ومبارياته ونقاط اللاعبين فيه.')) return;
+                        setBkBusy(true);
+                        await onRestoreBooking?.();
+                        setBkBusy(false);
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-amber-400 text-amber-950 font-black text-sm disabled:opacity-50"
+                    >
+                      استرجاع الحجز اللي اتقفل
+                    </button>
+                  </div>
+                );
+              })()}
               <div className="text-xs font-black text-emerald-300">اختار الفرق ({bkChosen.length}/{BOOKING_MAX_TEAMS})</div>
               <div className="flex flex-wrap gap-2">
                 {Object.values(teams).map((t) => {
