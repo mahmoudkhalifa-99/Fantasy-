@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Match, MatchEventType, Player, PlayerMatchStats, Team } from '../types';
 import {
   LiveState,
@@ -23,6 +23,8 @@ interface Props {
   allRoundStats: Record<number, { p: Record<string, PlayerMatchStats> }>;
   bookingStats?: { p: Record<string, PlayerMatchStats> };
   onLiveUpdate: (matchId: string, fn: Mutator) => void;
+  bookingActive?: boolean; // وضع الحجز شغال: نعرض ماتشات الحجز بس ونفتح على الماتش الحالي
+  bookingMatchId?: string;
 }
 
 const ACTIONS: { type: MatchEventType; label: string; icon: string; cls: string }[] = [
@@ -38,12 +40,21 @@ const ACTIONS: { type: MatchEventType; label: string; icon: string; cls: string 
 const ICON: Record<string, string> = Object.fromEntries(ACTIONS.map((a) => [a.type, a.icon]));
 const LABEL: Record<string, string> = Object.fromEntries(ACTIONS.map((a) => [a.type, a.label]));
 
-export const LiveMatchConsole: React.FC<Props> = ({ matches, teams, players, allRoundStats, bookingStats, onLiveUpdate }) => {
+export const LiveMatchConsole: React.FC<Props> = ({ matches: allMatches, teams, players, allRoundStats, bookingStats, onLiveUpdate, bookingActive = false, bookingMatchId }) => {
+  // في وضع الحجز بنعرض ماتشات الحجز بس عشان مايتلخبطش مع جدول الدورة
+  const matches = useMemo<Record<string, Match>>(
+    () => (bookingActive ? (Object.fromEntries(Object.entries(allMatches).filter(([, m]) => m.booking)) as Record<string, Match>) : allMatches),
+    [allMatches, bookingActive]
+  );
+  const pickInitial = () => {
+    if (bookingActive && bookingMatchId && matches[bookingMatchId]) return bookingMatchId;
+    return Object.values(matches).find((m) => m.status === 'live')?.id || Object.values(matches).find((m) => m.status === 'upcoming')?.id || Object.keys(matches)[0] || '';
+  };
   const list = Object.values(matches).sort((a, b) => {
     const o = { live: 0, upcoming: 1, finished: 2 } as const;
     return o[a.status] - o[b.status] || a.round - b.round;
   });
-  const [selId, setSelId] = useState<string>(() => list.find((m) => m.status === 'live')?.id || list.find((m) => m.status === 'upcoming')?.id || list[0]?.id || '');
+  const [selId, setSelId] = useState<string>(() => pickInitial());
   const [action, setAction] = useState<MatchEventType>('goal');
   const [assistFor, setAssistFor] = useState<{ teamId: string; scorerId: string } | null>(null);
   const [showAttendance, setShowAttendance] = useState(false);
@@ -60,7 +71,7 @@ export const LiveMatchConsole: React.FC<Props> = ({ matches, teams, players, all
   // لو المباريات اتحمّلت بعد فتح الشاشة (أو المباراة المختارة اتمسحت) اختار أنسب مباراة تلقائيًا
   useEffect(() => {
     if (!selId || !matches[selId]) {
-      const next = list.find((m) => m.status === 'live')?.id || list.find((m) => m.status === 'upcoming')?.id || list[0]?.id || '';
+      const next = pickInitial();
       if (next !== selId) setSelId(next);
     } else if (matches[selId].booking && matches[selId].status === 'finished') {
       // الحجز: بعد ما المباراة تخلص نروح للمباراة الجاية تلقائيًا

@@ -826,6 +826,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           allRoundStats={allRoundStats}
           bookingStats={bookingStats}
           onLiveUpdate={onLiveUpdate}
+          bookingActive={!!booking?.active}
+          bookingMatchId={booking?.currentMatchId}
         />
       )}
 

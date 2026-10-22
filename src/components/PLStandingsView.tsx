@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronRight, ChevronDown, ChevronUp, Crown, Minus, ArrowUp, ArrowDown, Trophy } from 'lucide-react';
-import type { Entry, Player, TournamentConfig } from '../types';
+import type { Entry, Player, SquadSelection, Team, TournamentConfig } from '../types';
 import { computeStandings } from '../utils/standings';
+import { calculatePlayerRoundPoints, POSITIONS_SHORT, POS_ORDER } from '../utils/fantasyScoring';
 
 interface Props {
   entries: Record<string, Entry>;
   players: Record<string, Player>;
+  teams?: Record<string, Team>;
   cfg: TournamentConfig;
   allRoundStats: Record<number, { p: Record<string, any> }>;
   currentUserId: string;
@@ -16,8 +18,9 @@ const COLORS = ['#7c3aed', '#0ea5e9', '#16a34a', '#d97706', '#dc2626', '#0d9488'
 const colorOf = (id: string) => COLORS[[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 const initials = (name: string) => (name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('') || '؟').toUpperCase();
 
-export const PLStandingsView: React.FC<Props> = ({ entries, players, cfg, allRoundStats, currentUserId, onBack }) => {
+export const PLStandingsView: React.FC<Props> = ({ entries, players, teams = {}, cfg, allRoundStats, currentUserId, onBack }) => {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [lineupRound, setLineupRound] = useState<number | null>(null);
   const { rows, gwRound, rounds } = useMemo(() => computeStandings(entries, players, allRoundStats, cfg), [entries, players, allRoundStats, cfg]);
   const updatedAt = useMemo(
     () => new Date().toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }),
@@ -110,7 +113,7 @@ export const PLStandingsView: React.FC<Props> = ({ entries, players, cfg, allRou
               <div key={r.entry.id} className={isMe ? 'bg-amber-50 dark:bg-amber-400/10' : ''}>
                 <button
                   type="button"
-                  onClick={() => setOpenId(open ? null : r.entry.id)}
+                  onClick={() => { setOpenId(open ? null : r.entry.id); setLineupRound(null); }}
                   className="w-full grid grid-cols-[44px_1fr_46px_56px] gap-1 items-center px-3 py-3 border-t border-gray-100 dark:border-emerald-900/50 text-right cursor-pointer"
                 >
                   <div className="flex flex-col items-center gap-0.5">
@@ -154,22 +157,73 @@ export const PLStandingsView: React.FC<Props> = ({ entries, players, cfg, allRou
                   </span>
                 </button>
 
-                {open && (
-                  <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-                    {rounds.length === 0 ? (
-                      <span className="text-[11px] text-gray-500 dark:text-emerald-400">لسه مفيش جولات اتلعبت</span>
-                    ) : (
-                      rounds.map((rd) => (
-                        <span
-                          key={rd}
-                          className="px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-emerald-950 text-[11px] font-bold text-gray-700 dark:text-emerald-200"
-                        >
-                          ج{rd}: <b className="font-mono text-gray-900 dark:text-white">{r.byRound[rd] ?? 0}</b>
-                        </span>
-                      ))
-                    )}
-                  </div>
-                )}
+                {open && (() => {
+                  if (rounds.length === 0) {
+                    return <div className="px-4 pb-3"><span className="text-[11px] text-gray-500 dark:text-emerald-400">لسه مفيش جولات اتلعبت</span></div>;
+                  }
+                  const selR = lineupRound !== null && rounds.includes(lineupRound) ? lineupRound : gwRound;
+                  // نفس منطق الحساب: لو الجولة مفيهاش تشكيلة محفوظة بنستخدم آخر تشكيلة قبلها
+                  let sq: SquadSelection | undefined = r.entry.rounds?.[selR];
+                  for (let i = selR - 1; i >= 1 && !sq; i--) sq = r.entry.rounds?.[i];
+                  const stats = allRoundStats[selR]?.p || {};
+                  const ids = sq?.ids ?? [];
+                  const sorted = [...ids].sort((a, b) => POS_ORDER.indexOf(players[a]?.pos) - POS_ORDER.indexOf(players[b]?.pos));
+                  const row = (pid: string, bench = false) => {
+                    const pl = players[pid];
+                    if (!pl) return null;
+                    const isCap = sq?.cap === pid;
+                    const pts = calculatePlayerRoundPoints(pl, stats[pid]);
+                    return (
+                      <div key={pid} className={`flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 ${bench ? 'bg-gray-50 dark:bg-emerald-950/60' : 'bg-gray-100 dark:bg-emerald-950'}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[10px] font-black text-amber-600 dark:text-amber-300 w-7 shrink-0">{POSITIONS_SHORT[pl.pos]}</span>
+                          <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{pl.name}</span>
+                          {isCap && <span className="bg-amber-400 text-amber-950 text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center shrink-0">C</span>}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-gray-500 dark:text-emerald-400 truncate max-w-[70px]">{teams[pl.teamId]?.name ?? ''}</span>
+                          <span className="text-xs font-black font-mono text-gray-900 dark:text-white w-8 text-center">{isCap ? pts * 2 : pts}</span>
+                        </div>
+                      </div>
+                    );
+                  };
+                  return (
+                    <div className="px-3 pb-3 space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {rounds.map((rd) => (
+                          <button
+                            key={rd}
+                            type="button"
+                            onClick={() => setLineupRound(rd)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer ${rd === selR ? 'bg-amber-400 text-amber-950' : 'bg-gray-100 dark:bg-emerald-950 text-gray-700 dark:text-emerald-200'}`}
+                          >
+                            ج{rd}: <b className="font-mono">{r.byRound[rd] ?? 0}</b>
+                          </button>
+                        ))}
+                      </div>
+                      {!sq || ids.length === 0 ? (
+                        <p className="text-[11px] font-bold text-gray-500 dark:text-emerald-400 py-1">
+                          {isMe ? 'لسه ما حفظتش تشكيلة للجولة دي.' : 'مفيش تشكيلة ظاهرة للجولة دي لسه. التشكيلات بتظهر للكل أول ما أول ماتش يبدأ.'}
+                        </p>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap gap-x-3 text-[11px] text-gray-500 dark:text-emerald-400">
+                            {sq.form && <span>الخطة: <b className="text-gray-900 dark:text-white" dir="ltr">{sq.form}</b></span>}
+                            {sq.chip && <span>الكارت: <b className="text-gray-900 dark:text-white">{sq.chip === 'wildcard' ? 'Wildcard' : 'Free Hit'}</b></span>}
+                            {sq.pen ? <span>الخصم: <b className="text-red-500">-{sq.pen}</b></span> : null}
+                          </div>
+                          <div className="space-y-1">{sorted.map((pid) => row(pid))}</div>
+                          {sq.bench && sq.bench.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="text-[11px] font-black text-gray-500 dark:text-emerald-400">الدكة</div>
+                              {sq.bench.map((pid) => row(pid, true))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })

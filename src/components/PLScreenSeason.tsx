@@ -299,7 +299,7 @@ export const PLScreenSeason: React.FC<PLScreenSeasonProps> = ({
       })()}
 
       {seasonSubTab === 'managers' && (
-        <PLStandingsView entries={entries} players={players} cfg={cfg} allRoundStats={allRoundStats} currentUserId={currentUserId} />
+        <PLStandingsView entries={entries} players={players} teams={teams} cfg={cfg} allRoundStats={allRoundStats} currentUserId={currentUserId} />
       )}
 
       {/* SUBTAB 1: MATCHES (المباريات - Matching Screenshot 3) */}
