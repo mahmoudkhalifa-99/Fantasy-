@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Player, Team, Position } from '../types';
 import { JerseyKit } from './JerseyKit';
 import { POSITIONS_SHORT, BENCH_POSITIONS, parseFormation, calculatePlayerRoundPoints } from '../utils/fantasyScoring';
-import { Crown, Plus, Trash2, ShieldAlert, ArrowRightLeft } from 'lucide-react';
+import { Crown, Plus, Trash2, ShieldAlert, ArrowRightLeft, ArrowUpDown } from 'lucide-react';
 
 interface PitchViewProps {
   squadIds: string[];
@@ -22,6 +22,7 @@ interface PitchViewProps {
   benchIds?: string[]; // الدكة الاحتياطي (مدافع + وسط + مهاجم)
   onBenchSlotClick?: (pos: Position, replacingId?: string) => void;
   onRemoveBench?: (playerId: string) => void;
+  onSwapBench?: (starterId: string, benchId: string) => void; // تبديل أساسي ⇄ احتياطي (نفس المركز)
 }
 
 export const PitchView: React.FC<PitchViewProps> = ({
@@ -42,8 +43,22 @@ export const PitchView: React.FC<PitchViewProps> = ({
   benchIds = [],
   onBenchSlotClick,
   onRemoveBench,
+  onSwapBench,
 }) => {
   const reqCounts = parseFormation(formation);
+
+  // تبديل الأساسي بالاحتياطي: دوس ⇅ على لاعب، وبعدين على اللاعب اللي في نفس المركز
+  const [swapFrom, setSwapFrom] = useState<string | null>(null);
+  const swapPlayer = swapFrom ? players[swapFrom] : undefined;
+  const swapFromIsBench = !!swapFrom && benchIds.includes(swapFrom);
+  const canSwapWith = (pid: string, isBenchCard: boolean) =>
+    !!swapPlayer && swapFrom !== pid && isBenchCard !== swapFromIsBench && players[pid]?.pos === swapPlayer.pos;
+  const doSwap = (pid: string) => {
+    if (!swapFrom || !onSwapBench) return;
+    if (swapFromIsBench) onSwapBench(pid, swapFrom);
+    else onSwapBench(swapFrom, pid);
+    setSwapFrom(null);
+  };
 
   // Group squad players by position
   const grouped: Record<Position, Player[]> = {
@@ -75,9 +90,35 @@ export const PitchView: React.FC<PitchViewProps> = ({
           return (
             <div
               key={player.id}
-              onClick={() => onPlayerClick && onPlayerClick(player)}
-              className="group relative flex flex-col items-center w-[84px] sm:w-[98px] transition-transform duration-150 hover:scale-105 cursor-pointer"
+              onClick={() => {
+                if (swapFrom) {
+                  if (canSwapWith(player.id, false)) doSwap(player.id);
+                  else setSwapFrom(null);
+                  return;
+                }
+                onPlayerClick && onPlayerClick(player);
+              }}
+              className={`group relative flex flex-col items-center w-[84px] sm:w-[98px] transition-transform duration-150 hover:scale-105 cursor-pointer ${
+                swapFrom && canSwapWith(player.id, false) ? 'ring-4 ring-amber-300 rounded-xl animate-pulse' : ''
+              }`}
             >
+              {/* تبديل مع الدكة */}
+              {!isReadOnly && onSwapBench && player.pos !== 'GK' && benchIds.some((bid) => players[bid]?.pos === player.pos) && (
+                <button
+                  type="button"
+                  title="بدّل مع الاحتياطي"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSwapFrom(swapFrom === player.id ? null : player.id);
+                  }}
+                  className={`absolute top-5 -left-1 z-20 w-6 h-6 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+                    swapFrom === player.id ? 'bg-amber-400 text-amber-950 ring-2 ring-amber-200' : 'bg-violet-600/90 text-white hover:bg-violet-700'
+                  }`}
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                </button>
+              )}
+
               {/* Captain quick-action floating badge */}
               {!isReadOnly && onSetCaptain && (
                 <button
@@ -190,6 +231,17 @@ export const PitchView: React.FC<PitchViewProps> = ({
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border-2 border-emerald-500/30 shadow-2xl bg-gradient-to-b from-[#14532d] via-[#166534] to-[#0f3d23]">
+      {swapFrom && swapPlayer && (
+        <div className="relative z-30 bg-amber-400 text-amber-950 text-xs font-black px-3 py-2 flex items-center justify-between gap-2">
+          <span>
+            {swapFromIsBench
+              ? `اختار الأساسي (${POSITIONS_SHORT[swapPlayer.pos]}) اللي هيخرج ويدخل مكانه ${swapPlayer.name}`
+              : `اختار الاحتياطي (${POSITIONS_SHORT[swapPlayer.pos]}) اللي هيدخل مكان ${swapPlayer.name}`}
+          </span>
+          <button type="button" onClick={() => setSwapFrom(null)} className="underline shrink-0">إلغاء</button>
+        </div>
+      )}
+
       {/* Turf striped texture */}
       <div
         className="absolute inset-0 pointer-events-none opacity-40"
@@ -263,10 +315,34 @@ export const PitchView: React.FC<PitchViewProps> = ({
               return (
                 <div
                   key={player.id}
-                  onClick={() => onPlayerClick && onPlayerClick(player)}
-                  className="group relative flex flex-col items-center w-[84px] sm:w-[98px] cursor-pointer"
+                  onClick={() => {
+                    if (swapFrom) {
+                      if (canSwapWith(player.id, true)) doSwap(player.id);
+                      else setSwapFrom(null);
+                      return;
+                    }
+                    onPlayerClick && onPlayerClick(player);
+                  }}
+                  className={`group relative flex flex-col items-center w-[84px] sm:w-[98px] cursor-pointer ${
+                    swapFrom && canSwapWith(player.id, true) ? 'ring-4 ring-amber-300 rounded-xl animate-pulse' : ''
+                  }`}
                 >
                   <div className="text-[10px] font-black text-emerald-300 mb-0.5">{POSITIONS_SHORT[pos]}</div>
+                  {!isReadOnly && onSwapBench && (
+                    <button
+                      type="button"
+                      title="بدّل مع الأساسي"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSwapFrom(swapFrom === player.id ? null : player.id);
+                      }}
+                      className={`absolute top-9 -left-1 z-20 w-6 h-6 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+                        swapFrom === player.id ? 'bg-amber-400 text-amber-950 ring-2 ring-amber-200' : 'bg-violet-600/90 text-white hover:bg-violet-700'
+                      }`}
+                    >
+                      <ArrowUpDown className="w-3 h-3" />
+                    </button>
+                  )}
                   {!isReadOnly && onRemoveBench && (
                     <button
                       type="button"
@@ -312,6 +388,9 @@ export const PitchView: React.FC<PitchViewProps> = ({
             })}
           </div>
           <p className="text-center text-[10px] text-emerald-300/70 mt-2">لو أساسي في نفس المركز مالعبش، الاحتياطي بياخد مكانه تلقائي</p>
+          {!isReadOnly && onSwapBench && (
+            <p className="text-center text-[10px] text-violet-300 mt-1">عايز تبدّل؟ دوس على زرار ⇅ اللي على اللاعب، وبعدين اختار اللاعب اللي في نفس المركز</p>
+          )}
         </div>
       )}
     </div>

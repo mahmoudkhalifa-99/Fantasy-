@@ -45,6 +45,9 @@ interface PLScreenFantasyProps {
   benchIds?: string[];
   onBenchSlotClick?: (pos: Position, replacingId?: string) => void;
   onRemoveBench?: (playerId: string) => void;
+  onSwapBench?: (starterId: string, benchId: string) => void;
+  onOpenPoints?: () => void;
+  onOpenPickTeam?: () => void;
   onFormationChange?: (f: string) => void;
   captainId: string;
   formation: string;
@@ -79,6 +82,9 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   benchIds = [],
   onBenchSlotClick,
   onRemoveBench,
+  onSwapBench,
+  onOpenPoints,
+  onOpenPickTeam,
   onFormationChange,
   captainId,
   formation,
@@ -109,7 +115,6 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
     setSavingName(false);
     if (ok) setEditingName(false);
   };
-  const [showPitchInline, setShowPitchInline] = useState<boolean>(false);
   const [squadModalType, setSquadModalType] = useState<'highest' | 'average' | null>(null);
 
   // Compute live match stats for current active gameweek
@@ -271,7 +276,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
 
             <button
               type="button"
-              onClick={onOpenPickTeamModal}
+              onClick={onOpenPickTeam ?? onOpenPickTeamModal}
               className="text-white/80 hover:text-white p-1 transition-colors"
               title="تعديل التشكيلة"
             >
@@ -307,9 +312,9 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
               {/* 2. النقاط (User Live Points) - Clickable to toggle pitch */}
               <button
                 type="button"
-                onClick={() => setShowPitchInline(!showPitchInline)}
+                onClick={onOpenPoints}
                 className="group p-2 rounded-2xl bg-black/30 hover:bg-black/40 border-2 border-amber-300/60 hover:border-amber-300 transition-all text-center flex flex-col items-center justify-center cursor-pointer shadow-lg active:scale-95"
-                title="اضغط لعرض أو إخفاء تشكيلتك"
+                title="اضغط لعرض نقاط تشكيلتك"
               >
                 <span className="block text-4xl sm:text-5xl font-black font-mono text-white leading-none drop-shadow-md group-hover:scale-105 transition-transform">
                   {userScore}
@@ -319,7 +324,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
                   <span className="text-xs">⚡</span>
                 </span>
                 <span className="text-[9px] text-amber-200/80 font-mono">
-                  {showPitchInline ? 'إخفاء الملعب' : 'عرض الملعب'}
+                  شوف نقاط لاعبينك
                 </span>
               </button>
 
@@ -357,11 +362,19 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
           <div className="space-y-2.5 pt-2">
             <button
               type="button"
-              onClick={() => setShowPitchInline(!showPitchInline)}
+              onClick={onOpenPoints}
+              className="w-full py-3.5 px-4 bg-[#102a45]/90 hover:bg-[#102a45] text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-98 border border-white/20 cursor-pointer"
+            >
+              <span>📊 النقاط (Points)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenPickTeam ?? onOpenPickTeamModal}
               className="w-full py-3.5 px-4 bg-[#102a45]/90 hover:bg-[#102a45] text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-98 border border-white/20 cursor-pointer"
             >
               <Shirt className="w-5 h-5 text-cyan-300" />
-              <span>{showPitchInline ? 'إخفاء الملعب' : '👕 اختيار التشكيلة (Pick Team)'}</span>
+              <span>👕 اختيار التشكيلة (Pick Team)</span>
             </button>
 
             <button
@@ -390,67 +403,6 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Inline Interactive Football Pitch (when Pick Team is toggled) */}
-      {showPitchInline && (
-        <div className="space-y-3 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between bg-[#15251c] p-3 rounded-2xl border border-emerald-800">
-            <div className="text-xs">
-              <span className="text-emerald-300">اللاعبين: </span>
-              <strong className="text-white font-mono">{squadIds.length}/{SQUAD_SIZE}</strong>
-              <span className="mx-2">•</span>
-              <span className="text-emerald-300">الميزانية المتبقية: </span>
-              <strong className="text-amber-300 font-mono">{remainingBudget.toFixed(1)}م</strong>
-            </div>
-
-            {isDraftDirty && (
-              <button
-                type="button"
-                onClick={onSaveSquad}
-                className="px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs rounded-xl shadow transition-colors cursor-pointer"
-              >
-                حفظ التشكيلة
-              </button>
-            )}
-          </div>
-
-          {onFormationChange && (
-            <div className="mb-2">
-              <div className="text-[11px] font-bold text-emerald-300 mb-1">الخطة (دفاع-وسط-هجوم)</div>
-              <div className="flex flex-wrap gap-1.5">
-                {SUPPORTED_FORMATIONS.map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => onFormationChange(f)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono transition-colors ${
-                      f === formation ? 'bg-amber-400 text-amber-950' : 'bg-emerald-900/60 text-emerald-200 hover:bg-emerald-800'
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <PitchView
-            squadIds={squadIds}
-            benchIds={benchIds}
-            onBenchSlotClick={onBenchSlotClick}
-            onRemoveBench={onRemoveBench}
-            captainId={captainId}
-            formation={formation}
-            players={players}
-            teams={teams}
-            onSlotClick={onSlotClick}
-            onRemovePlayer={onRemovePlayer}
-            onReplacePlayer={onReplacePlayer}
-            ptsMap={ptsMap}
-            onSetCaptain={onSetCaptain}
-          />
-        </div>
-      )}
 
       {/* Highest / Average Squad Lineup Modal */}
       {squadModalType && (

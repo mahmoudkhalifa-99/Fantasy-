@@ -124,6 +124,47 @@ export const LiveMatchConsole: React.FC<Props> = ({ matches: allMatches, teams, 
   const minute = isLive ? minuteOf(match, Date.now()) : 0;
   const events = [...(match.events ?? [])].reverse();
 
+  // الحضور: القايمة المحددة للماتش (أو أي لاعب ليه حدث). اللي مش حاضر مش بيتحسب له نقط.
+  const present = (p: Player) => ((p.teamId === match.teamAId ? match.playedA : match.playedB) ?? []).includes(p.id) || !!stats[p.id]?.pl;
+  const presentCount = (teamId: string) => teamPlayers(teamId).filter(present).length;
+  const canStart = [tA, tB].every((t) => !t || presentCount(t.id) >= 1);
+
+  const attendanceBody = (
+    <div className="space-y-3">
+      {[tA, tB].map(
+        (t) =>
+          t && (
+            <div key={t.id}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold text-amber-300">
+                  {t.name} <span className="text-emerald-400 font-mono">({presentCount(t.id)}/{teamPlayers(t.id).length})</span>
+                </span>
+                <span className="flex gap-2 text-[11px]">
+                  <button type="button" onClick={() => run((s) => ({ ...s, match: setTeamPlayedMatch(s.match, players, t.id, true) }))} className="text-emerald-300 underline">الكل</button>
+                  <button type="button" onClick={() => run((s) => ({ ...s, match: setTeamPlayedMatch(s.match, players, t.id, false) }))} className="text-red-300 underline">مسح</button>
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {teamPlayers(t.id).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => run((s) => ({ ...s, match: togglePlayedMatch(s.match, p) }))}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border ${
+                      present(p) ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-[#0a140f] text-emerald-400 border-emerald-800/60'
+                    }`}
+                  >
+                    {present(p) ? '✓ ' : ''}
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+      )}
+    </div>
+  );
+
   const onPlayerTap = (p: Player) => {
     if (!isLive) return;
     run((s) => applyEvent(s, players, action, p.id));
@@ -202,9 +243,22 @@ export const LiveMatchConsole: React.FC<Props> = ({ matches: allMatches, teams, 
 
         {/* Start / finish controls */}
         {match.status === 'upcoming' && (
-          <button type="button" onClick={() => run((s) => ({ ...s, match: startMatch(s.match) }))} className="w-full py-3 rounded-xl bg-red-600 text-white font-black text-base">
-            ▶ ابدأ المباراة (بث مباشر)
-          </button>
+          <div className="space-y-3">
+            <div className="bg-[#0a140f] border border-amber-500/40 rounded-2xl p-3 space-y-2">
+              <div className="text-xs font-black text-amber-300">👥 اختار اللاعبين الحاضرين قبل ما تبدأ</div>
+              <p className="text-[11px] text-emerald-300">اللي مش محدد مش بيتحسب له نقط، ولو لاعب أساسي في تشكيلة مشترك ما حضرش، الاحتياطي في نفس مركزه بياخد مكانه.</p>
+              {attendanceBody}
+            </div>
+            <button
+              type="button"
+              disabled={!canStart}
+              onClick={() => run((s) => ({ ...s, match: startMatch(s.match) }))}
+              className="w-full py-3 rounded-xl bg-red-600 text-white font-black text-base disabled:opacity-40"
+            >
+              ▶ ابدأ المباراة (بث مباشر)
+            </button>
+            {!canStart && <p className="text-[11px] text-amber-300 text-center">لازم تحدد لاعب واحد على الأقل من كل فريق عشان تبدأ</p>}
+          </div>
         )}
         {isFinished && (
           <button type="button" onClick={() => run((s) => ({ ...s, match: reopenMatch(s.match) }))} className="w-full py-2.5 rounded-xl bg-amber-500/20 text-amber-300 font-bold text-sm">
@@ -302,42 +356,10 @@ export const LiveMatchConsole: React.FC<Props> = ({ matches: allMatches, teams, 
           {/* Attendance */}
           <div className="bg-[#122218] border border-emerald-700/40 rounded-2xl p-3 shadow-xl">
             <button type="button" onClick={() => setShowAttendance((v) => !v)} className="w-full flex justify-between text-xs font-black text-white">
-              <span>👥 مين لعب؟ (لو ما حددتش، كل الفريق بيتحسب لما الماتش يخلص)</span>
+              <span>👥 الحضور (تقدر تضيف لاعب اتأخر). اللي مش محدد مش بيتحسب له نقط</span>
               <span>{showAttendance ? '▲' : '▼'}</span>
             </button>
-            {showAttendance && (
-              <div className="mt-3 space-y-3">
-                {[tA, tB].map(
-                  (t) =>
-                    t && (
-                      <div key={t.id}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-amber-300">{t.name}</span>
-                          <span className="flex gap-2 text-[11px]">
-                            <button type="button" onClick={() => run((s) => ({ ...s, match: setTeamPlayedMatch(s.match, players, t.id, true) }))} className="text-emerald-300 underline">الكل</button>
-                            <button type="button" onClick={() => run((s) => ({ ...s, match: setTeamPlayedMatch(s.match, players, t.id, false) }))} className="text-red-300 underline">مسح</button>
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {teamPlayers(t.id).map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => run((s) => ({ ...s, match: togglePlayedMatch(s.match, p) }))}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border ${
-                                stats[p.id]?.pl ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-[#0a140f] text-emerald-400 border-emerald-800/60'
-                              }`}
-                            >
-                              {stats[p.id]?.pl ? '✓ ' : ''}
-                              {p.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                )}
-              </div>
-            )}
+            {showAttendance && <div className="mt-3">{attendanceBody}</div>}
           </div>
 
           {/* Finish */}
