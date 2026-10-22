@@ -134,15 +134,38 @@ export async function loadMain(st: Storage): Promise<Data> {
 // مشتركين تجريبيين كانوا بيتضافوا تلقائيًا في النسخ القديمة: بنخفيهم من الترتيب والإحصائيات
 const DEMO_ENTRY_IDS = new Set(['user_captain_1', 'user_coach_2', 'user_player_3']);
 
-/** اللي بيتبعت للمتصفح: أرقام الموبايل وجهات الاتصال للمنظم بس. */
-export function publicView(main: Data, entries: Record<string, Data>, isAdmin: boolean): Data {
+/** الجولات اللي أول ماتش فيها بدأ (الماتش مبقاش upcoming)، وهل وضع الحجز بدأ. */
+function startedInfo(main: Data): { rounds: Set<number>; booking: boolean } {
+  const rounds = new Set<number>();
+  let booking = false;
+  for (const m of Object.values((main.matches ?? {}) as Record<string, any>)) {
+    if (!m || (m.status ?? 'upcoming') === 'upcoming') continue;
+    if (m.booking) booking = true;
+    else if (Number.isFinite(Number(m.round))) rounds.add(Number(m.round));
+  }
+  return { rounds, booking };
+}
+
+/**
+ * اللي بيتبعت للمتصفح: أرقام الموبايل وجهات الاتصال للمنظم بس.
+ * تشكيلات المشتركين التانيين بتتخبي لحد ما أول ماتش في الجولة (أو في الحجز) يبدأ،
+ * وبعدها كل المسجلين يقدروا يشوفوا تشكيلات بعض. المشترك دايمًا يشوف تشكيلته هو، والمنظم يشوف الكل.
+ */
+export function publicView(main: Data, entries: Record<string, Data>, isAdmin: boolean, viewerUid?: string | null): Data {
   const out: Data = { ...main, entries: {} };
   if (!isAdmin) delete out.contacts;
+  const started = startedInfo(main);
   for (const [uid, e] of Object.entries(entries)) {
     if (DEMO_ENTRY_IDS.has(uid)) continue;
     if (isAdmin) out.entries[uid] = e;
     else {
       const { phone: _p, email: _m, ...rest } = e;
+      if (uid !== viewerUid) {
+        const rounds: Record<string, any> = {};
+        for (const [r, sq] of Object.entries((rest.rounds ?? {}) as Record<string, any>)) if (started.rounds.has(Number(r))) rounds[r] = sq;
+        rest.rounds = rounds;
+        if (!started.booking) delete rest.bk;
+      }
       out.entries[uid] = rest;
     }
   }
@@ -266,7 +289,7 @@ export type Result = { status: number; json: any };
 
 export async function handleGet(st: Storage, ctx: Ctx): Promise<Result> {
   const main = await loadMain(st);
-  return { status: 200, json: publicView(main, await st.getEntries(), ctx.isAdmin) };
+  return { status: 200, json: publicView(main, await st.getEntries(), ctx.isAdmin, ctx.uid) };
 }
 
 export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Result> {
@@ -282,7 +305,7 @@ export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Resu
     await st.setMain(main);
     // التشكيلات القديمة كانت على لاعبين تجريبيين: بنفضّيها ونسيب الحسابات (الاسم والموبايل) زي ما هي
     for (const [uid, e] of Object.entries(await st.getEntries())) { const { bk: _bk, ...rest } = e as Data; await st.setEntry(uid, { ...rest, rounds: {} }); }
-    return { status: 200, json: { success: true, data: publicView(main, await st.getEntries(), ctx.isAdmin) } };
+    return { status: 200, json: { success: true, data: publicView(main, await st.getEntries(), ctx.isAdmin, ctx.uid) } };
   }
 
   const adminUpdate: Data = {};
@@ -311,5 +334,5 @@ export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Resu
     await st.setEntry(id, entry);
   }
 
-  return { status: 200, json: { success: true, data: publicView(main, await st.getEntries(), ctx.isAdmin) } };
+  return { status: 200, json: { success: true, data: publicView(main, await st.getEntries(), ctx.isAdmin, ctx.uid) } };
 }
