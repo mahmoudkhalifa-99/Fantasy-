@@ -4,7 +4,7 @@ import { initialTournamentData } from './defaultData.js';
 import { deriveAllStats, deriveBookingStats } from '../src/utils/deriveStats.js';
 import { isRoundLocked } from '../src/utils/deadline.js';
 import { isBookingLocked } from '../src/utils/booking.js';
-import { chipUsedRound, effectiveBudget, findBaseSquad, transferInfo } from '../src/utils/transfers.js';
+import { chipUsedRound, effectiveBudget, findBaseSquad, findBaseSquadAll, transferInfo } from '../src/utils/transfers.js';
 
 export type Data = Record<string, any>;
 
@@ -230,7 +230,7 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
       const used = chipUsedRound(rounds, chip, editRound);
       if (used !== null) return { error: `استخدمت كارت ${chip === 'wildcard' ? 'Wildcard' : 'Free Hit'} قبل كده في الجولة ${used}` };
     }
-    const base = findBaseSquad(rounds, editRound);
+    const base = findBaseSquadAll(rounds, editRound); // التبديل بين الأساسي والدكة مش بيتحسب تحويل
     const t = transferInfo(sq.ids, base, chip, cfg);
 
     // امسح النسخة التلقائية بتاعة Free Hit القديمة (لو كانت موجودة) وارجع احسبها
