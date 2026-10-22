@@ -103,6 +103,26 @@ export function calculatePlayerRoundPoints(
   return total;
 }
 
+/** التبديلات التلقائية: لو أساسي (غير الحارس) مالعبش والاحتياطي في نفس مركزه لعب، الاحتياطي بيدخل مكانه. */
+export function getAutoSubs(
+  squadIds: string[],
+  players: Record<string, Player>,
+  roundStats: Record<string, PlayerMatchStats> = {},
+  benchIds: string[] = []
+): { inId: string; outId: string }[] {
+  const used = new Set<string>();
+  const subs: { inId: string; outId: string }[] = [];
+  for (const bid of benchIds) {
+    const b = players[bid];
+    if (!b || b.pos === 'GK' || !roundStats[bid]?.pl) continue;
+    const slot = squadIds.find((sid) => !used.has(sid) && players[sid]?.pos === b.pos && !roundStats[sid]?.pl);
+    if (!slot) continue;
+    used.add(slot);
+    subs.push({ inId: bid, outId: slot });
+  }
+  return subs;
+}
+
 export function calculatePlayerTotalPoints(
   playerId: string,
   players: Record<string, Player>,

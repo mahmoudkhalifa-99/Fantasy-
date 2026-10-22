@@ -4,7 +4,7 @@ export const DEFAULT_FREE_TRANSFERS = 1;
 export const DEFAULT_TRANSFER_PENALTY = 4;
 
 export type ChipName = 'wildcard' | 'freehit';
-type RoundsLike = Record<string | number, { ids: string[]; chip?: string; auto?: boolean } | undefined>;
+type RoundsLike = Record<string | number, { ids: string[]; bench?: string[]; chip?: string; auto?: boolean } | undefined>;
 
 export function transferRules(cfg: { freeTransfers?: number; transferPenalty?: number } | undefined) {
   const free = Number.isFinite(Number(cfg?.freeTransfers)) && cfg?.freeTransfers !== undefined ? Math.max(0, Number(cfg.freeTransfers)) : DEFAULT_FREE_TRANSFERS;
@@ -19,6 +19,16 @@ export function findBaseSquad(rounds: RoundsLike | undefined, editRound: number)
   for (let r = editRound - 1; r >= 1; r--) {
     const sq = rounds[r];
     if (sq && sq.ids?.length && sq.chip !== 'freehit') return sq.ids;
+  }
+  return null;
+}
+
+/** كل لاعبين تشكيلة الأساس (الأساسي + الدكة): اللاعب اللي كان على الدكة وطلع أساسي مش بيتحسب تحويل. */
+export function findBaseSquadAll(rounds: RoundsLike | undefined, editRound: number): string[] | null {
+  if (!rounds) return null;
+  for (let r = editRound - 1; r >= 1; r--) {
+    const sq = rounds[r];
+    if (sq && sq.ids?.length && sq.chip !== 'freehit') return [...sq.ids, ...(sq.bench ?? [])];
   }
   return null;
 }
