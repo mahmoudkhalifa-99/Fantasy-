@@ -971,6 +971,7 @@ export default function App() {
         <PLStandingsView
           entries={vEntries}
           players={players}
+          teams={teams}
           cfg={cfg}
           allRoundStats={vStats}
           currentUserId={userId}
