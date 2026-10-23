@@ -9,7 +9,7 @@ import { chipUsedRound, effectiveBudget, findBaseSquad, findBaseSquadAll, transf
 export type Data = Record<string, any>;
 
 /** الحقول اللي المنظم بس يقدر يعدلها */
-export const ADMIN_FIELDS = ['cfg', 'teams', 'players', 'matches', 'stats', 'topStories', 'booking', 'bstats', 'bookingArchive'] as const;
+export const ADMIN_FIELDS = ['cfg', 'teams', 'players', 'matches', 'stats', 'topStories', 'booking', 'bstats'] as const;
 const SQUAD_SIZE = 7;
 const POS = ['GK', 'DEF', 'MID', 'FWD'] as const;
 
@@ -153,7 +153,7 @@ function startedInfo(main: Data): { rounds: Set<number>; booking: boolean } {
  */
 export function publicView(main: Data, entries: Record<string, Data>, isAdmin: boolean, viewerUid?: string | null): Data {
   const out: Data = { ...main, entries: {} };
-  if (!isAdmin) { delete out.contacts; delete out.bookingArchive; }
+  if (!isAdmin) delete out.contacts;
   const started = startedInfo(main);
   for (const [uid, e] of Object.entries(entries)) {
     if (DEMO_ENTRY_IDS.has(uid)) continue;
@@ -301,7 +301,7 @@ export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Resu
     if (!ctx.isAdmin) return { status: 403, json: { error: 'admin_required' } };
     const stories: Record<string, any> = {};
     for (const [k, v] of Object.entries((main.topStories ?? {}) as Record<string, any>)) if (v?.actionType !== 'live' && v?.actionType !== 'modal') stories[k] = v;
-    main = { ...main, teams: {}, players: {}, matches: {}, stats: {}, bstats: { p: {} }, bookingArchive: {}, contacts: {}, booking: { active: false }, topStories: stories, cfg: { ...(main.cfg ?? {}), round: 1, locked: false } };
+    main = { ...main, teams: {}, players: {}, matches: {}, stats: {}, bstats: { p: {} }, contacts: {}, booking: { active: false }, topStories: stories, cfg: { ...(main.cfg ?? {}), round: 1, locked: false } };
     await st.setMain(main);
     // التشكيلات القديمة كانت على لاعبين تجريبيين: بنفضّيها ونسيب الحسابات (الاسم والموبايل) زي ما هي
     for (const [uid, e] of Object.entries(await st.getEntries())) { const { bk: _bk, ...rest } = e as Data; await st.setEntry(uid, { ...rest, rounds: {} }); }
