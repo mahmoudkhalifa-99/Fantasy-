@@ -335,6 +335,13 @@ export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Resu
       main.bstats = { p: deriveBookingStats(main.matches, main.players) };
     }
     await st.setMain(main);
+    // تصفير الحجز: بنمسح تشكيلات الحجز كلها (الأساسية والمجهّزة للجاي) من كل المشتركين
+    if (body.resetBooking === true) {
+      for (const [uid, e] of Object.entries(await st.getEntries())) {
+        const { bk: _bk, bkNext: _bn, ...rest } = e as Data;
+        if (_bk || _bn) await st.setEntry(uid, rest);
+      }
+    }
     // حجز جديد: التشكيلات اللي جهّزها المشتركين بعد الحجز اللي فات بتبقى هي تشكيلة الحجز الجديد
     if (body.newBooking === true) {
       for (const [uid, e] of Object.entries(await st.getEntries())) {
