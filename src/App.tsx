@@ -132,6 +132,7 @@ export default function App() {
   // Draft squad state
   const [squadIds, setSquadIds] = useState<string[]>([]);
   const [captainId, setCaptainId] = useState<string>('');
+  const [viceId, setViceId] = useState<string>('');
   const [benchIds, setBenchIds] = useState<string[]>([]);
   const [benchPickPos, setBenchPickPos] = useState<Position | null>(null);
   const [formation, setFormation] = useState<string>('2-2-2');
@@ -140,12 +141,28 @@ export default function App() {
 
   // ديدلاين تشكيلة الحجز: ربع ساعة قبل أول ماتش في الحجز
   const bookingEnded = isBookingMode && !!booking && !booking.active;
-  const bookingLocked = isBookingMode && (bookingEnded || isBookingLocked(booking, matches, nowTick));
+  const bookingLocked = isBookingMode && !bookingEnded && isBookingLocked(booking, matches, nowTick);
   const bookingDl = bookingDeadlineMs(booking);
   const blockIfBookingLocked = () => {
     if (!bookingLocked) return false;
-    showToast(bookingEnded ? '🔒 الحجز خلص، التشكيلة مقفولة' : '🔒 تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)');
+    showToast('🔒 تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)');
     return true;
+  };
+
+  // فتح شاشة تعديل (اختيار التشكيلة / الانتقالات): لو الحجز خلص بنروح لتشكيلة الدورة ونفتح التعديل عليها
+  const openEditor = async (open: () => void) => {
+    if (bookingEnded) {
+      viewRef.current = 'main';
+      setViewMode('main');
+      setIsDraftDirty(false);
+      setPlayerToReplaceId(null);
+      setIsPickerOpen(false);
+      await fetchData();
+      open();
+      return;
+    }
+    if (blockIfBookingLocked()) return;
+    open();
   };
 
   // ===== عدسة الوضع (اللي المشترك بيشوفه) =====
@@ -277,12 +294,12 @@ export default function App() {
           if (sq && sq.ids) {
             setSquadIds(sq.ids);
             setBenchIds(sq.bench || []);
-            setCaptainId(sq.cap || sq.ids[0] || '');
+            setCaptainId(sq.cap || sq.ids[0] || ''); setViceId(sq.vice || '');
             setFormation(sq.form || '2-2-2');
           } else {
             setSquadIds([]);
             setBenchIds([]);
-            setCaptainId('');
+            setCaptainId(''); setViceId('');
           }
         } else {
           const mainMatches = Object.fromEntries(Object.entries((data.matches || {}) as Record<string, Match>).filter(([, m]) => !m.booking));
@@ -300,19 +317,19 @@ export default function App() {
           if (sq && sq.ids) {
             setSquadIds(sq.ids);
             setBenchIds(sq.bench || []);
-            setCaptainId(sq.cap || sq.ids[0] || '');
+            setCaptainId(sq.cap || sq.ids[0] || ''); setViceId(sq.vice || '');
             if (sq.form) setFormation(sq.form);
           } else {
             setSquadIds([]);
             setBenchIds([]);
-            setCaptainId('');
+            setCaptainId(''); setViceId('');
           }
         }
       } else {
         // حساب جديد: تشكيلة فاضية، المشترك هو اللي يختار لاعبينه
         setSquadIds([]);
         setBenchIds([]);
-        setCaptainId('');
+        setCaptainId(''); setViceId('');
       }
     } catch (err) {
       console.error('Data fetch error:', err);
@@ -509,9 +526,10 @@ export default function App() {
       ...(userPhone ? { phone: userPhone } : {}),
       joined: entries[userId]?.joined || Date.now(),
     };
+    const viceOk = !!viceId && viceId !== captainId && squadIds.includes(viceId);
     // وضع الحجز: بنحفظ في تشكيلة الحجز المنفصلة (bk) ومنلمسش تشكيلات الجولات
     const updatedUserEntry: Entry = isBookingMode
-      ? { ...baseEntry, rounds: {}, bk: { ids: [...squadIds], ...(benchIds.length ? { bench: [...benchIds] } : {}), cap: captainId, form: formation } }
+      ? { ...baseEntry, rounds: {}, bk: { ids: [...squadIds], ...(benchIds.length ? { bench: [...benchIds] } : {}), cap: captainId, ...(viceOk ? { vice: viceId } : {}), form: formation } }
       : {
           ...baseEntry,
           rounds: {
@@ -520,6 +538,7 @@ export default function App() {
               ids: [...squadIds],
               ...(benchIds.length ? { bench: [...benchIds] } : {}),
               cap: captainId,
+              ...(viceOk ? { vice: viceId } : {}),
               form: formation,
               ...(activeChip ? { chip: activeChip } : {}),
             },
@@ -579,6 +598,7 @@ export default function App() {
       if (captainId === playerToReplaceId) {
         setCaptainId(player.id);
       }
+      if (viceId === playerToReplaceId) setViceId(player.id);
       setPlayerToReplaceId(null);
       setIsDraftDirty(true);
       showToast(`✅ تم استبدال اللاعب بـ ${player.name}`);
@@ -597,7 +617,9 @@ export default function App() {
     setSquadIds(nextSquad);
     if (captainId === pid) {
       setCaptainId(nextSquad[0] || '');
+      if (viceId === nextSquad[0]) setViceId('');
     }
+    if (viceId === pid) setViceId('');
     setIsDraftDirty(true);
   };
 
@@ -636,6 +658,7 @@ export default function App() {
     setSquadIds((prev) => prev.map((id) => (id === starterId ? benchId : id)));
     setBenchIds((prev) => prev.map((id) => (id === benchId ? starterId : id)));
     if (captainId === starterId) setCaptainId(benchId);
+    if (viceId === starterId) setViceId(benchId);
     setIsDraftDirty(true);
     showToast(`🔄 ${b.name} بقى أساسي و${s.name} نزل الدكة`);
   };
@@ -648,8 +671,21 @@ export default function App() {
     setIsPickerOpen(true);
   };
 
+  // نائب الكابتن: لو الكابتن مالعبش، نقاطه x2 بتروح للنائب لو لعب
+  const handleSetVice = (pid: string) => {
+    if (blockIfBookingLocked()) return;
+    if (pid === captainId) {
+      showToast('الكابتن مينفعش يبقى نائب كمان');
+      return;
+    }
+    setViceId(pid);
+    setIsDraftDirty(true);
+    showToast(`✅ ${players[pid]?.name || 'اللاعب'} بقى نائب الكابتن`);
+  };
+
   const handleSetCaptain = (pid: string) => {
     if (blockIfBookingLocked()) return;
+    if (viceId === pid) setViceId('');
     setCaptainId(pid);
     setIsDraftDirty(true);
     showToast(`⭐ تم اختيار ${players[pid]?.name || 'اللاعب'} كابتن (x2)!`);
@@ -831,7 +867,7 @@ export default function App() {
     const ok = await syncServerData({ wipe: true });
     if (!ok) return;
     setSquadIds([]);
-    setCaptainId('');
+    setCaptainId(''); setViceId('');
     setActiveChip(null);
     await fetchData();
     showToast('✅ تم مسح كل البيانات التجريبية');
@@ -1000,6 +1036,8 @@ export default function App() {
           squadIds={squadIds}
           benchIds={benchIds}
           captainId={captainId}
+          viceId={viceId}
+          onSetVice={handleSetVice}
           formation={formation}
           isDraftDirty={isDraftDirty}
           editRound={isBookingMode ? bkRound : cfg.locked ? cfg.round + 1 : cfg.round}
@@ -1146,11 +1184,9 @@ export default function App() {
                 onSwapBench={handleSwapBench}
                 onOpenPoints={() => setIsPointsOpen(true)}
                 bookingEnded={bookingEnded}
-                onOpenPickTeam={() => {
-                  if (blockIfBookingLocked()) return;
-                  setIsPickTeamOpen(true);
-                }}
+                onOpenPickTeam={() => openEditor(() => setIsPickTeamOpen(true))}
                 captainId={captainId}
+                viceId={viceId}
                 formation={formation}
                 isDraftDirty={isDraftDirty}
                 onOpenPickTeamModal={() => {
@@ -1163,10 +1199,7 @@ export default function App() {
                   if (blockIfBookingLocked()) return;
                   setIsTransfersPageOpen(true);
                 }}
-                onOpenTransfersPage={() => {
-                  if (blockIfBookingLocked()) return;
-                  setIsTransfersPageOpen(true);
-                }}
+                onOpenTransfersPage={() => openEditor(() => setIsTransfersPageOpen(true))}
                 onOpenStandings={() => setIsStandingsOpen(true)}
                 myStanding={(() => {
                   const st = computeStandings(vEntries, players, vStats, cfg);
