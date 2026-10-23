@@ -6,7 +6,6 @@ import {
   Entry,
   Position,
   PlayerMatchStats, Match } from '../types';
-import { PitchView } from './PitchView';
 import { formatDeadline, roundDeadlineMs } from '../utils/deadline';
 import { SquadScoreModal } from './SquadScoreModal';
 import {
@@ -51,6 +50,7 @@ interface PLScreenFantasyProps {
   onOpenPickTeam?: () => void;
   onFormationChange?: (f: string) => void;
   captainId: string;
+  viceId?: string;
   formation: string;
   isDraftDirty: boolean;
   onOpenPickTeamModal: () => void;
@@ -89,6 +89,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   onOpenPickTeam,
   onFormationChange,
   captainId,
+  viceId = '',
   formation,
   isDraftDirty,
   onOpenPickTeamModal,
@@ -141,8 +142,8 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   // Dynamic automatic calculation of user live points based on current squad & captain
   const userScore = useMemo(() => {
     if (!squadIds.length) return 0;
-    return calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc, benchIds) - roundPenalty(entries[currentUserId]?.rounds, cfg.round);
-  }, [squadIds, benchIds, captainId, players, roundStatsDoc, entries, currentUserId, cfg.round]);
+    return calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc, benchIds, viceId) - roundPenalty(entries[currentUserId]?.rounds, cfg.round);
+  }, [squadIds, benchIds, captainId, viceId, players, roundStatsDoc, entries, currentUserId, cfg.round]);
 
   // Dynamic automatic calculation of all entries scores + user live score
   const { avgScore, highScore } = useMemo(() => {
@@ -152,7 +153,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
     Object.values(entries).forEach((e) => {
       // If this entry is the current user and user has live edits, use live squad
       if (e.id === currentUserId && squadIds.length > 0) {
-        scores.push(calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc, benchIds) - roundPenalty(e.rounds, cfg.round));
+        scores.push(calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc, benchIds, viceId) - roundPenalty(e.rounds, cfg.round));
         return;
       }
 
@@ -166,7 +167,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
         }
       }
       if (sq && sq.ids && sq.ids.length > 0) {
-        scores.push(calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || []) - roundPenalty(e.rounds, cfg.round));
+        scores.push(calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || [], sq.vice) - roundPenalty(e.rounds, cfg.round));
       }
     });
 
@@ -190,7 +191,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   const dlMs = roundDeadlineMs(matches, editRound, cfg);
   const deadlineText = bookingMode
     ? bookingEnded
-      ? '🏁 الحجز خلص، النقاط والترتيب ظاهرين لحد ما يبدأ حجز جديد'
+      ? '🏁 الحجز خلص (النقاط والترتيب ظاهرين). تقدر تعدّل تشكيلة الدورة من اختيار التشكيلة أو Transfers'
       : bookingLocked
       ? '🔒 تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)'
       : bookingDeadline

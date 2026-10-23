@@ -87,7 +87,7 @@ export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
         }
       }
       if (sq && sq.ids && sq.ids.length > 0) {
-        const score = calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || []) - roundPenalty(e.rounds, round);
+        const score = calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || [], sq.vice) - roundPenalty(e.rounds, round);
         if (score > bestScore) {
           bestScore = score;
           bestEntry = e;
@@ -200,7 +200,7 @@ export const SquadScoreModal: React.FC<SquadScoreModalProps> = ({
       }
       if (sq && sq.ids && sq.ids.length > 0) {
         allManagerScores.push(
-          calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || []) - roundPenalty(e.rounds, round)
+          calculateSquadRoundPoints(sq.ids, sq.cap, players, roundStatsDoc, sq.bench || [], sq.vice) - roundPenalty(e.rounds, round)
         );
       }
     });

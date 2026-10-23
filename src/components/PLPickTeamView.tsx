@@ -12,6 +12,7 @@ interface Props {
   squadIds: string[];
   benchIds: string[];
   captainId: string;
+  viceId: string;
   formation: string;
   isDraftDirty: boolean;
   editRound: number;
@@ -21,6 +22,7 @@ interface Props {
   onSaveSquad: () => void;
   onFormationChange: (f: string) => void;
   onSetCaptain: (id: string) => void;
+  onSetVice: (id: string) => void;
   onSlotClick: (pos: Position) => void;
   onBenchSlotClick: (pos: Position, replacingId?: string) => void;
   onRemoveBench: (id: string) => void;
@@ -30,8 +32,8 @@ interface Props {
 
 /** شاشة اختيار التشكيلة: الخطة + التبديل بين الأساسي والاحتياطي + الكابتن. (تغيير لاعب بلاعب من بره من شاشة Transfers) */
 export const PLPickTeamView: React.FC<Props> = ({
-  cfg, players, teams, matches, squadIds, benchIds, captainId, formation, isDraftDirty, editRound, bookingMode = false, deadlineText,
-  onBack, onSaveSquad, onFormationChange, onSetCaptain, onSlotClick, onBenchSlotClick, onRemoveBench, onSwapBench, onOpenTransfers,
+  cfg, players, teams, matches, squadIds, benchIds, captainId, viceId, formation, isDraftDirty, editRound, bookingMode = false, deadlineText,
+  onBack, onSaveSquad, onFormationChange, onSetCaptain, onSetVice, onSlotClick, onBenchSlotClick, onRemoveBench, onSwapBench, onOpenTransfers,
 }) => {
   const [sel, setSel] = useState<string | null>(null);
   const isBench = (id: string) => benchIds.includes(id);
@@ -75,6 +77,7 @@ export const PLPickTeamView: React.FC<Props> = ({
         chipTone="pos"
         subText={playerFixture(p, matches, teams)}
         isCaptain={id === captainId}
+        isVice={id === viceId}
         selected={sel === id}
         highlight={canSwap(sel, id)}
         onClick={() => onCard(id)}
@@ -178,6 +181,15 @@ export const PLPickTeamView: React.FC<Props> = ({
                   👑 خليه كابتن
                 </button>
               )}
+              {selIsStarter && sel !== captainId && sel !== viceId && (
+                <button
+                  type="button"
+                  onClick={() => { onSetVice(sel!); setSel(null); }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-200 text-slate-900 text-xs font-black"
+                >
+                  V نائب الكابتن
+                </button>
+              )}
               {!selIsStarter && (
                 <button
                   type="button"
@@ -194,7 +206,7 @@ export const PLPickTeamView: React.FC<Props> = ({
           </>
         ) : (
           <p className="text-[11px] text-center font-bold text-gray-600 dark:text-emerald-300">
-            دوس على لاعب أساسي ثم على احتياطي بنفس مركزه عشان تبدّلهم، أو اختار لاعب عشان تخليه كابتن. القميص اللي عليه C هو الكابتن.
+            دوس على لاعب أساسي ثم على احتياطي بنفس مركزه عشان تبدّلهم، أو اختار لاعب أساسي عشان تخليه كابتن (C) أو نائب الكابتن (V). لو الكابتن ما لعبش، الـ x2 بتروح للنائب.
           </p>
         )}
       </InfoCard>

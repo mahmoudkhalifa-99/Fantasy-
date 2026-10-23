@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronRight, ChevronDown, ChevronUp, Crown, Minus, ArrowUp, ArrowDown, Trophy } from 'lucide-react';
 import type { Entry, Player, SquadSelection, Team, TournamentConfig } from '../types';
 import { computeStandings } from '../utils/standings';
-import { calculatePlayerRoundPoints, POSITIONS_SHORT, POS_ORDER } from '../utils/fantasyScoring';
+import { calculatePlayerRoundPoints, effectiveCaptain, POSITIONS_SHORT, POS_ORDER } from '../utils/fantasyScoring';
 
 interface Props {
   entries: Record<string, Entry>;
@@ -172,6 +172,8 @@ export const PLStandingsView: React.FC<Props> = ({ entries, players, teams = {},
                     const pl = players[pid];
                     if (!pl) return null;
                     const isCap = sq?.cap === pid;
+                    const isVice = !!sq?.vice && sq.vice === pid && !isCap;
+                    const doubled = !!sq && pid === effectiveCaptain(sq.cap, sq.vice, stats);
                     const pts = calculatePlayerRoundPoints(pl, stats[pid]);
                     return (
                       <div key={pid} className={`flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 ${bench ? 'bg-gray-50 dark:bg-emerald-950/60' : 'bg-gray-100 dark:bg-emerald-950'}`}>
@@ -179,10 +181,11 @@ export const PLStandingsView: React.FC<Props> = ({ entries, players, teams = {},
                           <span className="text-[10px] font-black text-amber-600 dark:text-amber-300 w-7 shrink-0">{POSITIONS_SHORT[pl.pos]}</span>
                           <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{pl.name}</span>
                           {isCap && <span className="bg-amber-400 text-amber-950 text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center shrink-0">C</span>}
+                          {isVice && <span className="bg-slate-200 text-slate-900 text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center shrink-0">V</span>}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-[10px] text-gray-500 dark:text-emerald-400 truncate max-w-[70px]">{teams[pl.teamId]?.name ?? ''}</span>
-                          <span className="text-xs font-black font-mono text-gray-900 dark:text-white w-8 text-center">{isCap ? pts * 2 : pts}</span>
+                          <span className="text-xs font-black font-mono text-gray-900 dark:text-white w-8 text-center">{doubled ? pts * 2 : pts}</span>
                         </div>
                       </div>
                     );

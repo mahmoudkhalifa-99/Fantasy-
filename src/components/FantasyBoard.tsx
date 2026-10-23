@@ -111,6 +111,7 @@ interface CardProps {
   chipTone?: 'price' | 'pos' | 'points' | 'muted';
   subText?: string; // تحت الاسم (اختياري)
   isCaptain?: boolean;
+  isVice?: boolean; // نائب الكابتن
   selected?: boolean;
   highlight?: boolean; // لاعب ينفع يتبدّل معاه
   dim?: boolean;
@@ -118,7 +119,7 @@ interface CardProps {
 }
 
 /** كارت اللاعب بنفس شكل شاشة الانتقالات */
-export const BoardCard: React.FC<CardProps> = ({ player, team, chip, chipTone = 'price', subText, isCaptain, selected, highlight, dim, onClick }) => (
+export const BoardCard: React.FC<CardProps> = ({ player, team, chip, chipTone = 'price', subText, isCaptain, isVice, selected, highlight, dim, onClick }) => (
   <div
     onClick={onClick}
     className={`flex flex-col items-center select-none w-[70px] sm:w-[86px] transition-transform ${onClick ? 'cursor-pointer active:scale-95' : ''} ${dim ? 'opacity-45' : ''} ${
@@ -130,6 +131,9 @@ export const BoardCard: React.FC<CardProps> = ({ player, team, chip, chipTone = 
     )}
     <div className="relative py-0.5">
       <JerseyKit c1={team?.c1} c2={team?.c2} pat={team?.pat} num={player.num} kitUrl={team?.kitUrl} isCaptain={isCaptain} size="md" />
+      {isVice && !isCaptain && (
+        <span className="absolute top-0 right-0 bg-slate-100 text-slate-900 text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center border-2 border-emerald-950 shadow-md">V</span>
+      )}
     </div>
     <div className="w-full bg-white dark:bg-[#0f1f16] rounded-md shadow-md border border-gray-200 dark:border-emerald-800/80 text-center overflow-hidden mt-0.5">
       <div className="px-1 py-0.5 text-[11px] font-extrabold text-gray-900 dark:text-white truncate">{player.name}</div>

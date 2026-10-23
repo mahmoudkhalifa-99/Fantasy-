@@ -76,6 +76,22 @@ export const RulesModal: React.FC<RulesModalProps> = ({
             <p className="text-emerald-200 text-xs">نقاط الكابتن بتتضاعف <b>(x2)</b> في الجولة، ومثال: لاعب جاب 9 نقاط ككابتن بيحسبلك <b>18</b>.</p>
           </div>
 
+          {/* Extra rules */}
+          <div className="bg-[#0b160f] p-3 rounded-xl border border-emerald-800/50 space-y-1.5">
+            <h4 className="font-bold text-amber-300 flex items-center gap-1.5 text-xs">
+              <Shield className="w-4 h-4" />
+              قواعد مهمة
+            </h4>
+            <ul className="list-disc list-inside space-y-1 text-emerald-200 text-xs">
+              <li><b>نائب الكابتن (V):</b> لو الكابتن ما لعبش في الجولة، الـ x2 بتروح للنائب لو لعب.</li>
+              <li><b>التبديل بين الأساسي والدكة</b> (من شاشة اختيار التشكيلة) مجاني ومش بيتحسب تحويل. التحويل هو بس إنك تجيب لاعب جديد من بره.</li>
+              <li><b>الحضور:</b> اللاعب اللي مش في قايمة الحاضرين في الماتش مبياخدش نقط، وقتها الاحتياطي في نفس مركزه بيدخل مكانه.</li>
+              <li><b>تشكيلات المشتركين:</b> بتظهر للكل أول ما أول ماتش في الجولة (أو في الحجز) يبدأ، وقبل كده كل واحد يشوف تشكيلته بس.</li>
+              <li><b>الحجز:</b> بعد ما الحجز يخلص نقاطه وترتيبه بيفضلوا ظاهرين لحد ما يبدأ حجز جديد، وتقدر تعدّل تشكيلة الدورة في أي وقت.</li>
+              <li><b>الشاشات:</b> «النقاط» لعرض نقاط لاعبينك (دوس على لاعب تشوف تفاصيل نقاطه)، و«اختيار التشكيلة» للخطة والتبديل والكابتن، و«Transfers» لتغيير لاعب بلاعب من بره.</li>
+            </ul>
+          </div>
+
           {/* Main Principles */}
           <div className="bg-[#0b160f] p-3 rounded-xl border border-emerald-800/50 space-y-1.5">
             <h4 className="font-bold text-amber-300 flex items-center gap-1.5 text-xs">

@@ -267,6 +267,16 @@ export const LiveMatchConsole: React.FC<Props> = ({ matches: allMatches, teams, 
         )}
       </div>
 
+      {isFinished && (
+        <div className="bg-[#122218] border border-emerald-700/40 rounded-2xl p-3 shadow-xl">
+          <button type="button" onClick={() => setShowAttendance((v) => !v)} className="w-full flex justify-between text-xs font-black text-white">
+            <span>👥 تعديل الحضور (اللي مش محدد مش بياخد نقط)</span>
+            <span>{showAttendance ? '▲' : '▼'}</span>
+          </button>
+          {showAttendance && <div className="mt-3">{attendanceBody}</div>}
+        </div>
+      )}
+
       {isLive && (
         <>
           {/* Action selector */}
