@@ -724,11 +724,26 @@ export default function App() {
     return ok;
   };
 
-  // إنهاء الحجز: بيتقفل بس، والنقاط والترتيب والمباريات بتفضل ظاهرة للمشتركين لحد ما تبدأ حجز جديد
+  // إنهاء الحجز: بيتقفل بس، والنقاط والترتيب والمباريات بتفضل ظاهرة للمشتركين لحد ما المنظم يدوس تصفير الحجز
   const handleEndBooking = async () => {
     if (!booking?.active) return;
     const ok = await syncServerData({ booking: { ...booking, active: false, endedAt: Date.now() } });
-    if (ok) showToast('تم إنهاء الحجز. النقاط والترتيب فاضلين ظاهرين لحد ما تبدأ حجز جديد');
+    if (ok) showToast('تم إنهاء الحجز. مفيش حاجة اتمسحت، دوس «تصفير الحجز» لما تجهز للحجز الجاي');
+  };
+
+  // تصفير الحجز: بيمسح مباريات ونقاط وترتيب الحجز وكل تشكيلات الحجز، وبيجهّز للحجز الجاي
+  const handleResetBooking = async (): Promise<boolean> => {
+    if (booking?.active) return false;
+    const nonBooking = Object.fromEntries(Object.entries(matches).filter(([, m]) => !m.booking)) as Record<string, Match>;
+    const ok = await syncServerData({
+      booking: { active: false },
+      matches: nonBooking,
+      bstats: { p: {} },
+      cfg: { ...cfgRaw, mode: 'tournament' },
+      resetBooking: true,
+    });
+    if (ok) showToast('تم تصفير الحجز: اتمسحت النقاط والتشكيلات. جاهز للحجز الجاي');
+    return ok;
   };
 
   // لو اتقفل بالغلط: رجّع الحجز يشتغل تاني
@@ -927,6 +942,7 @@ export default function App() {
             onStartBooking={handleStartBooking}
             onEndBooking={handleEndBooking}
             onResumeBooking={handleResumeBooking}
+            onResetBooking={handleResetBooking}
             entries={entries}
             cfg={cfgRaw}
             teams={teams}
