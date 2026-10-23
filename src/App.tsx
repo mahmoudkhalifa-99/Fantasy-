@@ -96,7 +96,8 @@ export default function App() {
   const [matches, setMatches] = useState<Record<string, Match>>({});
   // وضع الحجز عالم منفصل تمامًا عن الوضع الأساسي (زي تابات Fantasy / Challenge في تطبيق الدوري الإنجليزي):
   // المشترك هو اللي يبدّل بين "فانتازي الدورة" و"فانتازي الحجز" وكل واحد له مباريات وإحصائيات وتشكيلة.
-  const bookingActive = cfgRaw.mode === 'booking';
+  // تبويب الحجز بيظهر للمشتركين لو الوضع حجز والمنظم ما خفاهوش
+  const bookingActive = cfgRaw.mode === 'booking' && cfgRaw.showBooking !== false;
   const [viewMode, setViewMode] = useState<'main' | 'booking'>('main');
   const viewRef = useRef<'main' | 'booking'>('main');
   const initialViewDone = useRef(false); // أول تحميل بس: لو الحجز جاهز نفتح فانتازي الحجز علطول
@@ -264,7 +265,7 @@ export default function App() {
       // أول دخول: لو الحجز جاهز، ادخل على فانتازي الحجز علطول (مش فانتازي الدورة)
       if (!initialViewDone.current) {
         initialViewDone.current = true;
-        if (data.cfg?.mode === 'booking' && data.booking?.active && data.booking?.teamIds && !isAdminPath()) {
+        if (data.cfg?.mode === 'booking' && data.cfg?.showBooking !== false && data.booking?.teamIds && !isAdminPath()) {
           viewRef.current = 'booking';
           setViewMode('booking');
           setCurrentTab('fantasy');
@@ -276,7 +277,7 @@ export default function App() {
       if (uid && data.entries && data.entries[uid]) {
         const uEntry = data.entries[uid];
         setUserName(uEntry.name || localStorage.getItem('fantasy_dawra_name') || '');
-        const bkMode = viewRef.current === 'booking' && data.cfg?.mode === 'booking';
+        const bkMode = viewRef.current === 'booking' && data.cfg?.mode === 'booking' && data.cfg?.showBooking !== false;
         if (bkMode) {
           // وضع الحجز: تشكيلة منفصلة (entry.bk)، من غير كروت
           // الحجز خلص: بنعرض التشكيلة اللي بيجهّزها للحجز الجاي (لو موجودة)
@@ -718,7 +719,7 @@ export default function App() {
     nb.currentMatchId = id;
     // حجز جديد: نتايج ونقاط وترتيب الحجز القديم بتتصفّر هنا بس
     const nonBooking = Object.fromEntries(Object.entries(matches).filter(([, m]) => !m.booking)) as Record<string, Match>;
-    const ok = await syncServerData({ booking: nb, matches: { ...nonBooking, [id]: makeBookingMatch(nb, id) }, cfg: { ...cfgRaw, mode: 'booking' }, newBooking: true });
+    const ok = await syncServerData({ booking: nb, matches: { ...nonBooking, [id]: makeBookingMatch(nb, id) }, cfg: { ...cfgRaw, mode: 'booking', showBooking: true }, newBooking: true });
     if (ok) showToast('✅ بدأ وضع الحجز، المباراة الأولى جاهزة في المباراة المباشرة');
     return ok;
   };
@@ -734,7 +735,7 @@ export default function App() {
   const handleResumeBooking = async (): Promise<boolean> => {
     if (!booking || booking.active) return false;
     const { endedAt: _e, ...rest } = booking as BookingState & { endedAt?: number };
-    const ok = await syncServerData({ booking: { ...rest, active: true }, cfg: { ...cfgRaw, mode: 'booking' } });
+    const ok = await syncServerData({ booking: { ...rest, active: true }, cfg: { ...cfgRaw, mode: 'booking', showBooking: true } });
     if (ok) showToast('✅ الحجز رجع يشتغل');
     return ok;
   };
@@ -747,7 +748,7 @@ export default function App() {
 
   // Admin CRUD
   const handleUpdateConfig = async (newCfg: TournamentConfig) => {
-    if (await syncServerData({ cfg: newCfg })) showToast('✅ تم حفظ إعدادات الدورة');
+    if (await syncServerData({ cfg: newCfg })) showToast('✅ تم حفظ الإعدادات');
   };
 
   const handleAddTeam = async (newTeam: Omit<Team, 'id'>) => {
@@ -1231,7 +1232,7 @@ export default function App() {
                 allRoundStats={allRoundStats}
                 entries={entries}
                 currentUserId={userId}
-                booking={booking}
+                booking={bookingActive ? booking : null}
               />
             )}
 

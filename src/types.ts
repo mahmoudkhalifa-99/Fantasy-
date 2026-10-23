@@ -70,6 +70,7 @@ export interface TournamentConfig {
   budget: number;
   maxPerTeam: number;
   mode?: 'tournament' | 'booking';
+  showBooking?: boolean; // المنظم بيظهر/يخفي تبويب الحجز للمشتركين (الافتراضي ظاهر)
   adsWhatsapp?: string; // رقم واتساب لحجز الإعلانات (بكود الدولة)
   adsPhone?: string;
   autoLock?: boolean; // قفل تلقائي قبل أول ماتش (الافتراضي شغال)
