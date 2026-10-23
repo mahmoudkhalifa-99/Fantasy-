@@ -47,6 +47,7 @@ interface PLScreenFantasyProps {
   onRemoveBench?: (playerId: string) => void;
   onSwapBench?: (starterId: string, benchId: string) => void;
   onOpenPoints?: () => void;
+  bookingEnded?: boolean;
   onOpenPickTeam?: () => void;
   onFormationChange?: (f: string) => void;
   captainId: string;
@@ -84,6 +85,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   onRemoveBench,
   onSwapBench,
   onOpenPoints,
+  bookingEnded = false,
   onOpenPickTeam,
   onFormationChange,
   captainId,
@@ -187,7 +189,9 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   const editRound = cfg.locked ? cfg.round + 1 : cfg.round;
   const dlMs = roundDeadlineMs(matches, editRound, cfg);
   const deadlineText = bookingMode
-    ? bookingLocked
+    ? bookingEnded
+      ? '🏁 الحجز خلص، النقاط والترتيب ظاهرين لحد ما يبدأ حجز جديد'
+      : bookingLocked
       ? '🔒 تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)'
       : bookingDeadline
       ? `الديدلاين: ${formatDeadline(bookingDeadline)}`
