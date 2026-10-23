@@ -31,6 +31,7 @@ interface AdminPanelProps {
   onStartBooking?: (teamIds: string[], first: string, second: string, startAt?: number) => Promise<boolean>;
   onEndBooking?: () => Promise<void> | void;
   onResumeBooking?: () => Promise<boolean> | boolean;
+  onResetBooking?: () => Promise<boolean> | boolean;
   entries?: Record<string, Entry>;
   cfg: TournamentConfig;
   teams: Record<string, Team>;
@@ -61,6 +62,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onStartBooking,
   onEndBooking,
   onResumeBooking,
+  onResetBooking,
   entries = {},
   cfg,
   teams,
@@ -509,7 +511,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 type="button"
                 disabled={bkBusy}
                 onClick={async () => {
-                  if (!window.confirm('إنهاء الحجز؟ هيتقفل، لكن النقاط والترتيب هيفضلوا ظاهرين للمشتركين لحد ما تبدأ حجز جديد (وساعتها بيتصفّروا).')) return;
+                  if (!window.confirm('إنهاء الحجز؟ هيتقفل بس، ومفيش حاجة هتتمسح: النقاط والترتيب والتشكيلات فاضلين. لما تجهز للحجز الجاي دوس «تصفير الحجز».')) return;
                   setBkBusy(true);
                   await onEndBooking?.();
                   setBkBusy(false);
@@ -526,7 +528,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 const nm = (id: string) => teams[id]?.name || '—';
                 return (
                   <div className="bg-[#0a140f] border border-amber-500/40 rounded-xl p-3 space-y-2">
-                    <div className="text-amber-300 font-black text-xs">آخر حجز (اتقفل) • النقاط والترتيب ظاهرين للمشتركين لحد ما تبدأ حجز جديد</div>
+                    <div className="text-amber-300 font-black text-xs">آخر حجز (اتقفل) • مفيش حاجة اتمسحت: النقاط والترتيب والتشكيلات فاضلين لحد ما تدوس «تصفير الحجز»</div>
                     <div className="space-y-1">
                       {rows.map((r, i) => (
                         <div key={r.teamId} className="flex items-center justify-between text-xs text-white">
@@ -549,7 +551,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     >
                       إعادة تشغيل الحجز
                     </button>
-                    <p className="text-[11px] text-emerald-400">لو بدأت حجز جديد، نتايج ونقاط وترتيب الحجز ده بتتصفّر.</p>
+                    <button
+                      type="button"
+                      disabled={bkBusy}
+                      onClick={async () => {
+                        if (!window.confirm('تصفير الحجز؟ هيتمسح كل حاجة في الحجز: المباريات والنقاط والترتيب وكل تشكيلات المشتركين (حتى اللي جهّزوها للحجز الجاي). مينفعش ترجع تاني. تشكيلات الدورة مش هتتأثر.')) return;
+                        setBkBusy(true);
+                        await onResetBooking?.();
+                        setBkBusy(false);
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-red-600/90 text-white font-black text-sm disabled:opacity-50"
+                    >
+                      🗑 تصفير الحجز (مسح النقاط والتشكيلات)
+                    </button>
+                    <p className="text-[11px] text-emerald-400">لو بدأت حجز جديد من غير تصفير، نتايج ونقاط الحجز القديم بتتصفّر لكن تشكيلات المشتركين بتفضل.</p>
                   </div>
                 );
               })()}
