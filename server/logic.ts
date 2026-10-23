@@ -165,6 +165,7 @@ export function publicView(main: Data, entries: Record<string, Data>, isAdmin: b
         for (const [r, sq] of Object.entries((rest.rounds ?? {}) as Record<string, any>)) if (started.rounds.has(Number(r))) rounds[r] = sq;
         rest.rounds = rounds;
         if (!started.booking) delete rest.bk;
+        delete rest.bkNext;
       }
       out.entries[uid] = rest;
     }
@@ -258,17 +259,28 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
 
   // تشكيلة وضع الحجز: منفصلة تمامًا عن تشكيلات الجولات (مفيش تحويلات ولا كروت ولا قفل)
   let bk = existing?.bk;
+  let bkNext = existing?.bkNext;
   if (incoming?.bk) {
-    if (cfg.mode !== 'booking' || !main.booking?.active) return { error: 'وضع الحجز مش شغال دلوقتي' };
-    if (isBookingLocked(main.booking, main.matches)) return { error: 'تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)' };
+    const b = main.booking;
+    // الحجز خلص: التعديل بيتحفظ كتشكيلة للحجز الجاي (bkNext) ومبيلمسش نقاط الحجز اللي خلص
+    const ended = cfg.mode === 'booking' && !!b?.teamIds && !b?.active;
+    if (!ended) {
+      if (cfg.mode !== 'booking' || !b?.active) return { error: 'وضع الحجز مش شغال دلوقتي' };
+      if (isBookingLocked(b, main.matches)) return { error: 'تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)' };
+    }
     const err = validateSquad(incoming.bk, main, Number(cfg.budget));
     if (err) return { error: err };
-    bk = { ids: incoming.bk.ids, ...(incoming.bk.bench?.length ? { bench: incoming.bk.bench } : {}), cap: incoming.bk.cap, ...(incoming.bk.vice ? { vice: incoming.bk.vice } : {}), form: String(incoming.bk.form ?? '2-2-2') };
+    const out = { ids: incoming.bk.ids, ...(incoming.bk.bench?.length ? { bench: incoming.bk.bench } : {}), cap: incoming.bk.cap, ...(incoming.bk.vice ? { vice: incoming.bk.vice } : {}), form: String(incoming.bk.form ?? '2-2-2') };
+    if (ended) bkNext = out;
+    else {
+      bk = out;
+      bkNext = undefined;
+    }
   }
   const phone = incoming?.phone !== undefined ? String(incoming.phone).replace(/[^\d+]/g, '').slice(0, 15) : existing?.phone;
   const joined = existing?.joined ?? (Number(incoming?.joined) || Date.now());
   const mail = email || existing?.email;
-  return { entry: { id: existing?.id ?? incoming.id, name, ...(phone ? { phone } : {}), ...(mail ? { email: mail } : {}), joined, rounds, ...(bk ? { bk } : {}) } };
+  return { entry: { id: existing?.id ?? incoming.id, name, ...(phone ? { phone } : {}), ...(mail ? { email: mail } : {}), joined, rounds, ...(bk ? { bk } : {}), ...(bkNext ? { bkNext } : {}) } };
 }
 
 function findPrevSquad(rounds: Record<string, any>, editRound: number): any | null {
@@ -306,7 +318,7 @@ export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Resu
     main = { ...main, teams: {}, players: {}, matches: {}, stats: {}, bstats: { p: {} }, contacts: {}, booking: { active: false }, topStories: stories, cfg: { ...(main.cfg ?? {}), round: 1, locked: false } };
     await st.setMain(main);
     // التشكيلات القديمة كانت على لاعبين تجريبيين: بنفضّيها ونسيب الحسابات (الاسم والموبايل) زي ما هي
-    for (const [uid, e] of Object.entries(await st.getEntries())) { const { bk: _bk, ...rest } = e as Data; await st.setEntry(uid, { ...rest, rounds: {} }); }
+    for (const [uid, e] of Object.entries(await st.getEntries())) { const { bk: _bk, bkNext: _bn, ...rest } = e as Data; await st.setEntry(uid, { ...rest, rounds: {} }); }
     return { status: 200, json: { success: true, data: publicView(main, await st.getEntries(), ctx.isAdmin, ctx.uid) } };
   }
 
@@ -323,6 +335,13 @@ export async function handlePost(st: Storage, body: any, ctx: Ctx): Promise<Resu
       main.bstats = { p: deriveBookingStats(main.matches, main.players) };
     }
     await st.setMain(main);
+    // حجز جديد: التشكيلات اللي جهّزها المشتركين بعد الحجز اللي فات بتبقى هي تشكيلة الحجز الجديد
+    if (body.newBooking === true) {
+      for (const [uid, e] of Object.entries(await st.getEntries())) {
+        const { bkNext, ...rest } = e as Data;
+        if (bkNext) await st.setEntry(uid, { ...rest, bk: bkNext });
+      }
+    }
   }
 
   if (body.entry !== undefined) {
