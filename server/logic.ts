@@ -207,6 +207,7 @@ function validateSquad(sq: any, main: Data, budget: number): string | null {
   if (POS.some((k) => have[k] !== need[k])) return 'التشكيلة لا تطابق خطة اللعب';
   if (Object.values(perTeam).some((n) => n > Number(main.cfg?.maxPerTeam))) return 'تجاوزت الحد الأقصى من نفس الفريق';
   if (!sq.cap || !ids.includes(sq.cap)) return 'حدد الكابتن';
+  if (sq.vice && (!ids.includes(sq.vice) || sq.vice === sq.cap)) return 'نائب الكابتن لازم يكون من الأساسيين وغير الكابتن';
   return null;
 }
 
@@ -241,6 +242,7 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
       ids: sq.ids,
       ...(sq.bench?.length ? { bench: sq.bench } : {}),
       cap: sq.cap,
+      ...(sq.vice ? { vice: sq.vice } : {}),
       form: String(sq.form ?? '2-2-2'),
       ...(chip ? { chip } : {}),
       tc: t.made,
@@ -250,7 +252,7 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
     // Free Hit: التشكيلة بترجع تلقائيًا للي قبلها في الجولة اللي بعدها
     if (chip === 'freehit' && base && !rounds[nextKey]) {
       const prev = findPrevSquad(rounds, editRound);
-      if (prev) rounds[nextKey] = { ids: prev.ids, ...(prev.bench?.length ? { bench: prev.bench } : {}), cap: prev.cap, form: prev.form ?? '2-2-2', tc: 0, pen: 0, auto: true };
+      if (prev) rounds[nextKey] = { ids: prev.ids, ...(prev.bench?.length ? { bench: prev.bench } : {}), cap: prev.cap, ...(prev.vice ? { vice: prev.vice } : {}), form: prev.form ?? '2-2-2', tc: 0, pen: 0, auto: true };
     }
   }
 
@@ -261,7 +263,7 @@ export function mergeEntry(existing: Data | null, incoming: any, main: Data, ema
     if (isBookingLocked(main.booking, main.matches)) return { error: 'تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)' };
     const err = validateSquad(incoming.bk, main, Number(cfg.budget));
     if (err) return { error: err };
-    bk = { ids: incoming.bk.ids, ...(incoming.bk.bench?.length ? { bench: incoming.bk.bench } : {}), cap: incoming.bk.cap, form: String(incoming.bk.form ?? '2-2-2') };
+    bk = { ids: incoming.bk.ids, ...(incoming.bk.bench?.length ? { bench: incoming.bk.bench } : {}), cap: incoming.bk.cap, ...(incoming.bk.vice ? { vice: incoming.bk.vice } : {}), form: String(incoming.bk.form ?? '2-2-2') };
   }
   const phone = incoming?.phone !== undefined ? String(incoming.phone).replace(/[^\d+]/g, '').slice(0, 15) : existing?.phone;
   const joined = existing?.joined ?? (Number(incoming?.joined) || Date.now());
