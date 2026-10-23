@@ -105,7 +105,7 @@ function deriveFromList(roundMatches: Match[], players: Record<string, Player>, 
     }
 
     // المشاركة: القائمة المحددة بس. مفيش حد بيتحسب له نقط من غير ما يتحدد إنه لعب.
-    // (الاستثناء: مباريات قديمة اتدخلت يدويًا من غير تسجيل مباشر ومفيهاش قائمة، بنعتبر فيها كل الفريق لعب)
+    // مفيش قايمة حضور = مفيش حد بيتحسب له مشاركة (غير اللي ليه أحداث). لتعديل مباراة قديمة: افتحها من شاشة المباراة المباشرة وحدد الحاضرين.
     const sides: [string, string[] | undefined][] = [
       [m.teamAId, m.playedA],
       [m.teamBId, m.playedB],
@@ -113,8 +113,6 @@ function deriveFromList(roundMatches: Match[], players: Record<string, Player>, 
     for (const [tid, list] of sides) {
       if (list?.length) {
         for (const id of list) if (out[id]) out[id] = { ...out[id], pl: 1 };
-      } else if (m.status === 'finished' && !m.startedAt) {
-        for (const p of byTeam(tid)) out[p.id] = { ...out[p.id], pl: 1 };
       }
     }
 

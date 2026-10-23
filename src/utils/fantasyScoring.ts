@@ -103,6 +103,29 @@ export function calculatePlayerRoundPoints(
   return total;
 }
 
+export interface PointLine {
+  label: string;
+  count: number;
+  pts: number;
+}
+
+/** تفصيل نقاط لاعب في جولة (نفس حسابات calculatePlayerRoundPoints). */
+export function playerPointsBreakdown(player: Player | undefined, stats: PlayerMatchStats | undefined): PointLine[] {
+  if (!player || !stats || !stats.pl) return [];
+  const lines: PointLine[] = [{ label: 'المشاركة', count: 1, pts: SCORING_MATRIX.app }];
+  if (stats.g) lines.push({ label: 'أهداف', count: stats.g, pts: stats.g * SCORING_MATRIX.goal[player.pos] });
+  if (stats.a) lines.push({ label: 'أسيست', count: stats.a, pts: stats.a * SCORING_MATRIX.assist });
+  if (stats.cs && player.pos !== 'FWD') lines.push({ label: 'كلين شيت', count: 1, pts: SCORING_MATRIX.cs[player.pos] });
+  if (stats.ps && player.pos === 'GK') lines.push({ label: 'ضربات جزاء متصدية', count: stats.ps, pts: stats.ps * SCORING_MATRIX.ps });
+  if (stats.tk && player.pos === 'DEF') lines.push({ label: 'قطع كرات', count: stats.tk, pts: Math.floor(stats.tk / SCORING_MATRIX.tk.per) * SCORING_MATRIX.tk.pts });
+  if (stats.mo) lines.push({ label: 'أفضل لاعب', count: 1, pts: SCORING_MATRIX.mo });
+  if (stats.yc) lines.push({ label: 'كروت صفرا', count: stats.yc, pts: stats.yc * SCORING_MATRIX.yc });
+  if (stats.rc) lines.push({ label: 'كارت أحمر', count: stats.rc, pts: stats.rc * SCORING_MATRIX.rc });
+  if (stats.og) lines.push({ label: 'أهداف عكسية', count: stats.og, pts: stats.og * SCORING_MATRIX.og });
+  if (stats.pm) lines.push({ label: 'ضربات جزاء ضايعة', count: stats.pm, pts: stats.pm * SCORING_MATRIX.pm });
+  return lines;
+}
+
 /** التبديلات التلقائية: لو أساسي (غير الحارس) مالعبش والاحتياطي في نفس مركزه لعب، الاحتياطي بيدخل مكانه. */
 export function getAutoSubs(
   squadIds: string[],
@@ -141,19 +164,28 @@ export function calculatePlayerTotalPoints(
   return total;
 }
 
+/** اللي بتتضاعف نقاطه: الكابتن لو لعب، ولو ما لعبش فنائب الكابتن (لو لعب)، وإلا الكابتن. */
+export function effectiveCaptain(captainId: string, viceId: string | undefined, roundStats: Record<string, PlayerMatchStats> = {}): string {
+  if (captainId && roundStats[captainId]?.pl) return captainId;
+  if (viceId && viceId !== captainId && roundStats[viceId]?.pl) return viceId;
+  return captainId;
+}
+
 export function calculateSquadRoundPoints(
   squadIds: string[],
   captainId: string,
   players: Record<string, Player>,
   roundStats: Record<string, PlayerMatchStats> = {},
-  benchIds: string[] = []
+  benchIds: string[] = [],
+  viceId: string = ''
 ): number {
   let total = 0;
+  const doubled = effectiveCaptain(captainId, viceId, roundStats);
   for (const pid of squadIds) {
     const player = players[pid];
     const stats = roundStats[pid];
     const pts = calculatePlayerRoundPoints(player, stats);
-    total += pid === captainId ? pts * 2 : pts;
+    total += pid === doubled ? pts * 2 : pts;
   }
   // تبديل تلقائي: لو لاعب أساسي (غير الحارس) مالعبش، الاحتياطي في نفس مركزه ياخد مكانه لو لعب
   const usedStarters = new Set<string>();
