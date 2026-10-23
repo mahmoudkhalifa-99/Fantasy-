@@ -141,9 +141,14 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
 
   // Dynamic automatic calculation of user live points based on current squad & captain
   const userScore = useMemo(() => {
+    // الحجز خلص: نقاطك هي نقاط تشكيلة الحجز اللي اتلعبت، مش اللي بتجهّزها للحجز الجاي
+    if (bookingEnded) {
+      const fz = entries[currentUserId]?.rounds?.[cfg.round];
+      return fz ? calculateSquadRoundPoints(fz.ids, fz.cap, players, roundStatsDoc, fz.bench || [], fz.vice) : 0;
+    }
     if (!squadIds.length) return 0;
     return calculateSquadRoundPoints(squadIds, captainId, players, roundStatsDoc, benchIds, viceId) - roundPenalty(entries[currentUserId]?.rounds, cfg.round);
-  }, [squadIds, benchIds, captainId, viceId, players, roundStatsDoc, entries, currentUserId, cfg.round]);
+  }, [bookingEnded, squadIds, benchIds, captainId, viceId, players, roundStatsDoc, entries, currentUserId, cfg.round]);
 
   // Dynamic automatic calculation of all entries scores + user live score
   const { avgScore, highScore } = useMemo(() => {
@@ -191,7 +196,7 @@ export const PLScreenFantasy: React.FC<PLScreenFantasyProps> = ({
   const dlMs = roundDeadlineMs(matches, editRound, cfg);
   const deadlineText = bookingMode
     ? bookingEnded
-      ? '🏁 الحجز خلص (النقاط والترتيب ظاهرين). تقدر تعدّل تشكيلة الدورة من اختيار التشكيلة أو Transfers'
+      ? '🏁 الحجز خلص (النقاط والترتيب ظاهرين). تقدر تجهّز تشكيلتك للحجز الجاي من اختيار التشكيلة أو Transfers'
       : bookingLocked
       ? '🔒 تشكيلة الحجز اتقفلت (قبل أول ماتش بربع ساعة)'
       : bookingDeadline
