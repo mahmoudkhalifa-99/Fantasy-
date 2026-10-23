@@ -61,6 +61,7 @@ export interface Entry {
   email?: string;
   rounds: Record<number, SquadSelection>;
   bk?: SquadSelection; // تشكيلة وضع الحجز (منفصلة عن تشكيلات الجولات)
+  bkNext?: SquadSelection; // تجهيز تشكيلة الحجز الجاي (بيتحفظ بعد ما الحجز يخلص، من غير ما يغيّر نقاط الحجز اللي خلص)
   joined: number;
 }
 

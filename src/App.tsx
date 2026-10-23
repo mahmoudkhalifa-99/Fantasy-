@@ -149,18 +149,8 @@ export default function App() {
     return true;
   };
 
-  // فتح شاشة تعديل (اختيار التشكيلة / الانتقالات): لو الحجز خلص بنروح لتشكيلة الدورة ونفتح التعديل عليها
-  const openEditor = async (open: () => void) => {
-    if (bookingEnded) {
-      viewRef.current = 'main';
-      setViewMode('main');
-      setIsDraftDirty(false);
-      setPlayerToReplaceId(null);
-      setIsPickerOpen(false);
-      await fetchData();
-      open();
-      return;
-    }
+  // فتح شاشة تعديل (اختيار التشكيلة / الانتقالات) في نفس الوضع اللي واقف فيه (دورة أو حجز)
+  const openEditor = (open: () => void) => {
     if (blockIfBookingLocked()) return;
     open();
   };
@@ -289,7 +279,9 @@ export default function App() {
         const bkMode = viewRef.current === 'booking' && data.cfg?.mode === 'booking';
         if (bkMode) {
           // وضع الحجز: تشكيلة منفصلة (entry.bk)، من غير كروت
-          const sq = uEntry.bk;
+          // الحجز خلص: بنعرض التشكيلة اللي بيجهّزها للحجز الجاي (لو موجودة)
+          const bkEnded = !!data.booking?.teamIds && !data.booking?.active;
+          const sq = bkEnded ? uEntry.bkNext || uEntry.bk : uEntry.bk;
           setActiveChip(null);
           if (sq && sq.ids) {
             setSquadIds(sq.ids);
@@ -548,7 +540,7 @@ export default function App() {
     const success = await syncServerData({ entry: updatedUserEntry });
     if (success) {
       setIsDraftDirty(false);
-      showToast(isBookingMode ? '✅ تم حفظ تشكيلة الحجز بنجاح!' : `✅ تم حفظ تشكيلة الجولة ${activeEditingRound} بنجاح!`);
+      showToast(isBookingMode ? (bookingEnded ? '✅ اتحفظت تشكيلتك للحجز الجاي' : '✅ تم حفظ تشكيلة الحجز بنجاح!') : `✅ تم حفظ تشكيلة الجولة ${activeEditingRound} بنجاح!`);
     }
   };
 
@@ -726,7 +718,7 @@ export default function App() {
     nb.currentMatchId = id;
     // حجز جديد: نتايج ونقاط وترتيب الحجز القديم بتتصفّر هنا بس
     const nonBooking = Object.fromEntries(Object.entries(matches).filter(([, m]) => !m.booking)) as Record<string, Match>;
-    const ok = await syncServerData({ booking: nb, matches: { ...nonBooking, [id]: makeBookingMatch(nb, id) }, cfg: { ...cfgRaw, mode: 'booking' } });
+    const ok = await syncServerData({ booking: nb, matches: { ...nonBooking, [id]: makeBookingMatch(nb, id) }, cfg: { ...cfgRaw, mode: 'booking' }, newBooking: true });
     if (ok) showToast('✅ بدأ وضع الحجز، المباراة الأولى جاهزة في المباراة المباشرة');
     return ok;
   };
@@ -1042,7 +1034,7 @@ export default function App() {
           isDraftDirty={isDraftDirty}
           editRound={isBookingMode ? bkRound : cfg.locked ? cfg.round + 1 : cfg.round}
           bookingMode={isBookingMode}
-          deadlineText={bookingEnded ? '🏁 الحجز خلص' : bookingLocked ? '🔒 التشكيلة اتقفلت' : undefined}
+          deadlineText={bookingEnded ? '🏁 الحجز خلص: تعديلك بيتحفظ للحجز الجاي' : bookingLocked ? '🔒 التشكيلة اتقفلت' : undefined}
           onBack={() => setIsPickTeamOpen(false)}
           onSaveSquad={handleSaveSquad}
           onFormationChange={handleFormationChange}
