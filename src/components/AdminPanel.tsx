@@ -471,6 +471,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </p>
           </div>
 
+          {cfg.mode === 'booking' && (
+            <label className="flex items-center justify-between gap-3 bg-[#0a140f] border border-emerald-800/60 rounded-xl p-3 cursor-pointer">
+              <span>
+                <span className="block text-sm font-black text-white">إظهار تبويب الحجز للمشتركين</span>
+                <span className="block text-[11px] text-emerald-400 mt-0.5">
+                  {cfg.showBooking !== false ? 'ظاهر: وأول ما المشترك يدخل اللعبة بيفتح على الحجز علطول.' : 'مخفي: المشتركين شايفين الدورة بس.'}
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="w-5 h-5 accent-emerald-500 shrink-0"
+                checked={cfg.showBooking !== false}
+                onChange={(e) => onUpdateConfig({ ...cfg, showBooking: e.target.checked })}
+              />
+            </label>
+          )}
+
           {booking?.active ? (
             <div className="space-y-3">
               <div className="bg-[#0a140f] border border-emerald-800/60 rounded-xl p-3 text-sm space-y-1">
